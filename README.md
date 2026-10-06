@@ -4,7 +4,7 @@ A small project and ticket manager built for the RovorAI Full Stack Developer as
 project cards, a project page with server-side search and filters, ticket create and edit, and GitHub repository
 insights cached for 5 minutes.
 
-**Live demo:** _added after deployment (Vercel + Neon)_ · **Stack:** Next.js 16, TypeScript, PostgreSQL, Drizzle ORM, TanStack Query, Tailwind CSS 4
+**Live demo: [rovorai-assignment.vercel.app](https://rovorai-assignment.vercel.app)** · **Stack:** Next.js 16, TypeScript, PostgreSQL (Neon), Drizzle ORM, TanStack Query, Tailwind CSS 4
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -16,6 +16,7 @@ insights cached for 5 minutes.
 - [How I built this](#how-i-built-this)
 - [Screenshots](#screenshots)
 - [Run it locally](#run-it-locally)
+- [Deployment](#deployment)
 - [Architecture](#architecture)
 - [Frontend state and data](#frontend-state-and-data)
 - [Database and data model](#database-and-data-model)
@@ -176,6 +177,21 @@ There is no separate backend process to start. The API runs inside the same Next
 | `LOG_LEVEL`             | no (`info`) | Structured JSON log verbosity                                                             |
 
 The server validates its configuration with Zod at startup and refuses to serve requests if it's invalid.
+
+## Deployment
+
+- **Hosting:** Vercel, functions in `iad1`, with Neon Postgres in `aws-us-east-1` (same region, so queries don't cross
+  regions). There's no separate backend host: the API ships in the same deployment.
+- **Database setup:** connected through the Vercel ↔ Neon integration, which provides `DATABASE_URL` (pooled) and
+  `DATABASE_URL_UNPOOLED` (direct). `GITHUB_TOKEN` is optional.
+- **Migrations ship with the deploy.** `pnpm vercel-build` ([`scripts/vercel-build.sh`](scripts/vercel-build.sh)) runs
+  on Vercel instead of `build`. On **production** builds it applies migrations over the direct connection and seeds only
+  an empty database, then builds. A failed migration fails the deploy, so the previous version keeps serving.
+- **Verified in production:**
+  - `pnpm smoke https://rovorai-assignment.vercel.app` passes all 19 checks, including live GitHub data and the 5-minute
+    cache;
+  - security headers are present (HSTS, `nosniff`, `frame-ancestors 'none'`);
+  - CI is green on `main`.
 
 ## Architecture
 
@@ -344,7 +360,7 @@ logged in [`ARCHITECTURE.md`](ARCHITECTURE.md), and the requirement checklist is
 - Data is fetched in the browser, so first content waits for JavaScript (see trade-offs). The next improvement would
   be server prefetch with TanStack's `HydrationBoundary`.
 
-**Incomplete:** the live deployment link above is added once the app is deployed.
+**Incomplete:** nothing from the PDF. Possible next steps: server prefetch for faster first paint, and a global ticket search.
 
 ## AI usage
 

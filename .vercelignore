@@ -1,0 +1,11 @@
+# Never upload local secrets, build output or the assignment spec with a CLI deploy.
+.env*
+!.env.example
+docs/*.pdf
+node_modules
+.next
+test-results
+playwright-report
+coverage
+*.tsbuildinfo
+.DS_Store

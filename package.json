@@ -21,7 +21,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:if-empty": "tsx scripts/seed.ts --if-empty",
     "smoke": "tsx scripts/smoke-api.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "vercel-build": "sh scripts/vercel-build.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.1",

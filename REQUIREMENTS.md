@@ -90,7 +90,7 @@ Legend: `[ ]` not started · `[x]` done and verified · **Verify** = U (unit tes
 
 | ID       | Requirement                               | Acceptance criteria                                                                              | Verify |
 | -------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ | ------ |
-| [ ] DB-1 | Persistent database                       | PostgreSQL (Docker locally, Neon in production)                                                  | M      |
+| [x] DB-1 | Persistent database                       | PostgreSQL (Docker locally, Neon in production)                                                  | M      |
 | [x] DB-2 | Projects, Tickets, and their relationship | `tickets.project_id` FK → `projects.id`, `ON DELETE CASCADE`, NOT NULL                           | I      |
 | [x] DB-3 | Versioned migrations                      | Drizzle SQL migrations committed under `drizzle/`                                                | M      |
 | [x] DB-4 | Seed data                                 | 3 projects (2 with real public repos, 1 without) and 18 tickets covering every status × priority | M      |
@@ -142,7 +142,7 @@ These are delivered after every PDF requirement above. Per the cut order in ARCH
 | [x] NFR-7  | Fail fast on bad config                                        | Env parsed with Zod at startup; clear error message                                                        |
 | [x] NFR-8  | Errors never leak internals                                    | 500 responses carry a generic message + request id; details logged server-side                             |
 | [x] NFR-9  | Observability (lightweight)                                    | Structured JSON logs per request (method, route, status, duration, requestId); `GET /api/health` checks DB |
-| [ ] NFR-10 | CI gate                                                        | GitHub Actions: lint, typecheck, unit + integration (Postgres service), build                              |
+| [x] NFR-10 | CI gate                                                        | GitHub Actions: lint, typecheck, unit + integration (Postgres service), build                              |
 | [ ] NFR-11 | Reproducible local setup                                       | `docker compose up -d && pnpm i && pnpm db:migrate && pnpm db:seed && pnpm dev`                            |
 
 ---
@@ -168,9 +168,9 @@ Each one goes under "Known limitations" in the README. Project edit/delete and t
 | --------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | [ ] SUB-1 | Git repository link with complete source                 | Public GitHub repo, `main` builds from a clean clone                                     |
 | [ ] SUB-2 | README with complete local run instructions              | A fresh clone following only the README reaches a working app                            |
-| [ ] SUB-3 | Live Vercel deployment link                              | Production URL works end-to-end (create project, create/edit ticket, search, insights)   |
-| [ ] SUB-4 | Separate backend hosting connected (if any)              | N/A by design — backend ships inside the same Vercel deployment; DB on Neon is connected |
-| [ ] SUB-5 | Assumptions, known limitations, incomplete functionality | README section, kept honest and current                                                  |
+| [x] SUB-3 | Live Vercel deployment link                              | Production URL works end-to-end (create project, create/edit ticket, search, insights)   |
+| [x] SUB-4 | Separate backend hosting connected (if any)              | N/A by design — backend ships inside the same Vercel deployment; DB on Neon is connected |
+| [x] SUB-5 | Assumptions, known limitations, incomplete functionality | README section, kept honest and current                                                  |
 | [ ] SUB-6 | Submitted before Thursday 8 Oct 2026 evening             | —                                                                                        |
 
 ### README must explain (PDF "README requirements")
