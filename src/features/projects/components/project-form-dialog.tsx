@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api-client'
 import { applyServerErrors } from '@/lib/form-errors'
+import { modEnterHint, submitOnModEnter } from '@/lib/keyboard'
 import { LIMITS } from '@/shared/domain'
 import type { Project } from '@/shared/schemas/api'
 import {
@@ -101,7 +102,7 @@ export function ProjectFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <form onSubmit={onSubmit} noValidate className="grid gap-6">
+        <form onKeyDown={submitOnModEnter} onSubmit={onSubmit} noValidate className="grid gap-6">
           <DialogHeader>
             <DialogTitle>{isEdit ? 'Edit project' : 'New project'}</DialogTitle>
             <DialogDescription>
@@ -168,7 +169,11 @@ export function ProjectFormDialog({
                 Cancel
               </Button>
             </DialogClose>
-            <SubmitButton pending={pending} pendingLabel={isEdit ? 'Saving…' : 'Creating…'}>
+            <SubmitButton
+              {...modEnterHint}
+              pending={pending}
+              pendingLabel={isEdit ? 'Saving…' : 'Creating…'}
+            >
               {isEdit ? 'Save changes' : 'Create project'}
             </SubmitButton>
           </DialogFooter>

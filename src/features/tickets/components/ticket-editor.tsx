@@ -10,6 +10,7 @@ import { SubmitButton } from '@/components/submit-button'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api-client'
 import { applyServerErrors } from '@/lib/form-errors'
+import { modEnterHint, submitOnModEnter } from '@/lib/keyboard'
 import { invalidate, queryKeys } from '@/lib/query-keys'
 import type { Ticket, TicketWithProject } from '@/shared/schemas/api'
 import {
@@ -73,6 +74,7 @@ export function TicketEditor({ ticket }: { ticket: TicketWithProject }) {
 
   return (
     <form
+      onKeyDown={submitOnModEnter}
       onSubmit={form.handleSubmit((values) => save(values, ticket.version))}
       noValidate
       className="space-y-6"
@@ -96,7 +98,12 @@ export function TicketEditor({ ticket }: { ticket: TicketWithProject }) {
       <TicketFields register={form.register} control={form.control} errors={errors} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <SubmitButton pending={update.isPending} pendingLabel="Saving…" disabled={!isDirty}>
+        <SubmitButton
+          {...modEnterHint}
+          pending={update.isPending}
+          pendingLabel="Saving…"
+          disabled={!isDirty}
+        >
           Save changes
         </SubmitButton>
         {isDirty && (

@@ -59,6 +59,10 @@ test('create a project: inline validation, server errors on the field, card appe
   await expect(page.getByTestId('project-card')).toHaveCount(4)
   await expect(count(page, 'Mobile App', 'Todo')).toHaveText('0')
   await expect(card(page, 'Mobile App').getByText('No tickets yet.')).toBeVisible()
+  // The empty card offers the next step, which opens the ticket dialog for that project.
+  await card(page, 'Mobile App').getByRole('button', { name: 'Create the first ticket' }).click()
+  await expect(page.getByRole('dialog', { name: 'New ticket' })).toContainText('in Mobile App')
+  await page.keyboard.press('Escape')
   await assertNoReload()
 })
 
@@ -105,4 +109,33 @@ test('footer links to the source and the 2-minute guide in a new tab', async ({ 
   )
   await expect(link).toHaveAttribute('target', '_blank')
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+})
+
+test('cards show done/total progress', async ({ page }) => {
+  await page.goto('/')
+  const bar = card(page, 'Internal Tools').getByRole('progressbar')
+  await expect(bar).toHaveAttribute('aria-valuenow', '2')
+  await expect(bar).toHaveAttribute('aria-valuemax', '5')
+  await expect(card(page, 'Internal Tools').getByText('2 of 5 done')).toBeVisible()
+})
+
+test('Ctrl/Cmd+Enter creates a ticket from the description field', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Create ticket in Data Layer' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New ticket' })
+  await dialog.getByLabel('Title').fill('Shortcut-created ticket')
+  await dialog.getByLabel('Description').fill('Line one')
+  await dialog.getByLabel('Description').press('ControlOrMeta+Enter')
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('Shortcut-created ticket').first()).toBeVisible()
+})
+
+test('the tab icon is the app mark, not the framework default', async ({ page, request }) => {
+  await page.goto('/')
+  const href = await page.locator('link[rel="icon"]').first().getAttribute('href')
+  expect(href).toMatch(/icon\.svg/)
+  const res = await request.get(href!)
+  expect(res.status()).toBe(200)
+  expect(res.headers()['content-type']).toContain('image/svg+xml')
+  expect((await request.get('/favicon.ico')).status()).toBe(404)
 })

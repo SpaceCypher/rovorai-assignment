@@ -73,25 +73,24 @@ test('project page (with insights and filters) has no violations', async ({ page
 test('delete-project dialog has no violations', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('link', { name: 'Open project Internal Tools' }).click()
-  await page.getByRole('button', { name: 'Project actions' }).click()
-  await page.getByRole('menuitem', { name: 'Delete project' }).click()
+  await page.getByRole('button', { name: 'Delete project' }).click()
   await expect(page.getByRole('alertdialog')).toBeVisible()
   await expect(page.getByRole('menu')).toBeHidden()
   await expectNoViolations(page)
 })
 
-test('project actions menu has no violations when open', async ({ page }) => {
+test('project page header actions and row Edit buttons have no violations', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('link', { name: 'Open project Internal Tools' }).click()
-  await page.getByRole('button', { name: 'Project actions' }).click()
-  await expect(page.getByRole('menu')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Delete project' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /^Edit / }).first()).toBeVisible()
   await expectNoViolations(page)
 })
 
 test('ticket page with a conflict banner has no violations', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('link', { name: 'Open project Internal Tools' }).click()
-  await page.getByTestId('ticket-list').getByRole('link').first().click()
+  await page.getByTestId('ticket-row').first().click()
   // Client-side navigation: wait for the ticket URL before reading the id from it.
   await page.waitForURL(/\/tickets\/[0-9a-f-]{36}$/)
   // Let the editor load the current version before "someone else" saves (realistic order;

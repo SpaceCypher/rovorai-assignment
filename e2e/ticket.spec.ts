@@ -12,12 +12,12 @@ test.beforeEach(async ({ page }) => {
   )
 })
 
-const rows = (page: Page) => page.getByTestId('ticket-list').getByRole('link')
+const rows = (page: Page) => page.getByTestId('ticket-row')
 const projectCount = (page: Page, status: string) =>
   page
     .getByRole('region', { name: 'Ticket counts for the whole project' })
-    .locator('dl > div', { hasText: status })
-    .locator('dd')
+    .getByRole('button', { name: new RegExp(`^Show only ${status} tickets`) })
+    .locator('[data-count]')
 const cardCount = (page: Page, project: string, status: string) =>
   page
     .getByTestId('project-card')
@@ -139,8 +139,7 @@ test('delete a ticket: back on the project page, list and counts updated', async
   await page.getByRole('link', { name: 'Open project Data Layer' }).click()
   await expect(rows(page)).toHaveCount(6)
   await rows(page).filter({ hasText: 'Upgrade Postgres to version 16' }).click()
-  await page.getByRole('button', { name: 'Ticket actions' }).click()
-  await page.getByRole('menuitem', { name: 'Delete ticket' }).click()
+  await page.getByRole('button', { name: 'Delete ticket' }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete ticket' }).click()
 
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/)

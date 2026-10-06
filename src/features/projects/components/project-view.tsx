@@ -5,9 +5,9 @@ import {
   ArrowLeft,
   FileQuestion,
   FolderGit,
+  GitBranch,
   Inbox,
   Loader2,
-  MoreHorizontal,
   Pencil,
   Plus,
   SearchX,
@@ -16,17 +16,9 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { GithubIcon } from '@/components/github-icon'
 import { PageHeader } from '@/components/page-header'
 import { EmptyState, ErrorState } from '@/components/states'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { RepositoryInsights } from '@/features/repository/components/repository-insights'
 import { CreateTicketDialog } from '@/features/tickets/components/create-ticket-dialog'
 import { TicketFilters } from '@/features/tickets/components/ticket-filters'
@@ -38,10 +30,11 @@ import { useUrlFilters } from '@/lib/url-filters'
 import { rememberProjectQuery } from '@/lib/last-project-view'
 import { filtersToSearchParams } from '@/shared/schemas/filters'
 import { useDelayedFlag } from '@/lib/use-delayed-flag'
+import type { TicketStatus } from '@/shared/domain'
 import { useProject, useTicketList } from '../hooks'
 import { DeleteProjectDialog } from './delete-project-dialog'
 import { ProjectFormDialog } from './project-form-dialog'
-import { StatusCounts } from './status-counts'
+import { StatusSummary } from './status-summary'
 
 const backLink = (
   <Link
@@ -136,35 +129,39 @@ export function ProjectView({ projectId }: { projectId: string }) {
   const meta = list.data?.meta
   const refreshing = list.isFetching && !list.isPending
 
+  const selectStatus = (status: TicketStatus) =>
+    // Segment = "show only this status"; clicking the active one again clears it.
+    setFilters({
+      status: filters.status.length === 1 && filters.status[0] === status ? [] : [status],
+    })
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow={backLink}
+        size="lg"
         title={p.name}
         description={
-          <>
-            <span className="block">
-              {p.description || <span className="italic">No description</span>}
-            </span>
-            {/* Same "repo line" as the dashboard card: a link when connected, a quiet way to connect otherwise. */}
-            <span className="mt-1 flex items-center gap-1.5 text-xs">
+          // Description and repo share one line (wrapping on narrow screens).
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>{p.description || <span className="italic">No description</span>}</span>
+            <span className="inline-flex min-w-0 items-center gap-1.5">
               {p.githubRepo ? (
-                <GithubIcon className="size-3.5 shrink-0" />
-              ) : (
-                <FolderGit className="size-3.5 shrink-0" aria-hidden />
-              )}
-              {p.githubRepo ? (
-                <a
-                  href={`https://github.com/${p.githubRepo}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="truncate font-mono hover:text-foreground hover:underline"
-                >
-                  {p.githubRepo}
-                  <span className="sr-only"> (opens GitHub in a new tab)</span>
-                </a>
+                <>
+                  <GitBranch className="size-3.5 shrink-0" aria-hidden />
+                  <a
+                    href={`https://github.com/${p.githubRepo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate font-mono text-sm hover:text-foreground hover:underline"
+                  >
+                    {p.githubRepo}
+                    <span className="sr-only"> (opens GitHub in a new tab)</span>
+                  </a>
+                </>
               ) : (
                 <>
+                  <FolderGit className="size-3.5 shrink-0" aria-hidden />
                   <span className="italic">No repository</span>
                   <span aria-hidden>·</span>
                   <button
@@ -177,27 +174,22 @@ export function ProjectView({ projectId }: { projectId: string }) {
                 </>
               )}
             </span>
-          </>
+          </span>
         }
         actions={
           <>
-            {/* Non-modal: a modal menu aria-hides the page while it stays focusable (axe). */}
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Project actions">
-                  <MoreHorizontal />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => openEdit(false)}>
-                  <Pencil /> Edit project
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
-                  <Trash2 /> Delete project
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Visible actions, not a ⋯ menu: people shouldn't have to guess where edit/delete live.
+                Delete sits apart from the primary action and reads as destructive. */}
+            <Button
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 /> Delete project
+            </Button>
+            <Button variant="outline" onClick={() => openEdit(false)}>
+              <Pencil /> Edit project
+            </Button>
             <Button onClick={() => setTicketOpen(true)}>
               <Plus /> New ticket
             </Button>
@@ -205,100 +197,121 @@ export function ProjectView({ projectId }: { projectId: string }) {
         }
       />
 
-      <section aria-label="Ticket counts for the whole project">
-        <StatusCounts counts={p.ticketCounts} className="max-w-xl" />
-      </section>
-
-      {/* The insights column exists only when there is a repo: no reserved dead space otherwise. */}
+      {/* Insights sit beside the summary + tickets column, only when there is a repo (L17). */}
       <div
         className={
           p.githubRepo
-            ? 'grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]'
+            ? 'grid items-start gap-6 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_20rem]'
             : 'grid items-start gap-6'
         }
       >
-        <section aria-labelledby="tickets-heading" className="min-w-0 space-y-4">
-          <div className="flex items-center gap-2">
-            <h2 id="tickets-heading" className="font-semibold">
-              Tickets
-            </h2>
-            {refreshing && (
-              <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+        <div className="min-w-0 space-y-6">
+          <section aria-label="Ticket counts for the whole project">
+            <StatusSummary
+              counts={p.ticketCounts}
+              selected={filters.status}
+              onSelect={selectStatus}
+            />
+          </section>
+
+          <section aria-labelledby="tickets-heading" className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h2 id="tickets-heading" className="text-lg font-semibold">
+                Tickets
+              </h2>
+              {refreshing && (
+                <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+              )}
+              <p className="tabular ml-auto text-sm text-muted-foreground" aria-live="polite">
+                {meta &&
+                  (hasFilters
+                    ? `${formatNumber(meta.count)} of ${formatNumber(total)} match`
+                    : `${formatNumber(meta.count)} ${meta.count === 1 ? 'ticket' : 'tickets'}`)}
+              </p>
+            </div>
+
+            {(total > 0 || hasFilters) && (
+              <TicketFilters
+                filters={filters}
+                onChange={setFilters}
+                onClear={clearFilters}
+                hasFilters={hasFilters}
+              />
             )}
-            <p className="tabular ml-auto text-xs text-muted-foreground" aria-live="polite">
-              {meta &&
-                (hasFilters
-                  ? `${formatNumber(meta.count)} of ${formatNumber(total)} match`
-                  : `${formatNumber(meta.count)} ${meta.count === 1 ? 'ticket' : 'tickets'}`)}
-            </p>
-          </div>
 
-          {(total > 0 || hasFilters) && (
-            <TicketFilters
-              filters={filters}
-              onChange={setFilters}
-              onClear={clearFilters}
-              hasFilters={hasFilters}
-            />
-          )}
-
-          {list.isPending ? (
-            showListSkeleton ? (
-              <TicketListSkeleton />
-            ) : null
-          ) : list.isError ? (
-            <ErrorState
-              title="Couldn’t load tickets"
-              error={list.error}
-              onRetry={() => list.refetch()}
-            />
-          ) : tickets && tickets.length === 0 ? (
-            hasFilters ? (
-              <EmptyState
-                icon={SearchX}
-                title="No tickets match these filters"
-                description={
-                  filters.q
-                    ? `Nothing matches “${filters.q}” with the selected filters.`
-                    : 'Try other statuses or priorities.'
-                }
-                action={
-                  <Button variant="outline" onClick={clearFilters}>
-                    Clear filters
-                  </Button>
-                }
+            {list.isPending ? (
+              // Space is reserved immediately (no layout shift for the insights panel below it on
+              // mobile, Lighthouse CLS); the skeleton only becomes visible after 200 ms, so fast
+              // loads never flash it.
+              <TicketListSkeleton className={showListSkeleton ? undefined : 'invisible'} />
+            ) : list.isError ? (
+              <ErrorState
+                title="Couldn’t load tickets"
+                error={list.error}
+                onRetry={() => list.refetch()}
               />
+            ) : tickets && tickets.length === 0 ? (
+              hasFilters ? (
+                <EmptyState
+                  icon={SearchX}
+                  title="No tickets match these filters"
+                  description={
+                    filters.q
+                      ? `Nothing matches “${filters.q}” with the selected filters.`
+                      : 'Try other statuses or priorities.'
+                  }
+                  action={
+                    <Button variant="outline" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={Inbox}
+                  title="No tickets yet"
+                  description="Tickets track work in this project. Create the first one."
+                  action={
+                    <Button onClick={() => setTicketOpen(true)}>
+                      <Plus /> New ticket
+                    </Button>
+                  }
+                />
+              )
             ) : (
-              <EmptyState
-                icon={Inbox}
-                title="No tickets yet"
-                description="Tickets track work in this project. Create the first one."
-                action={
-                  <Button onClick={() => setTicketOpen(true)}>
-                    <Plus /> New ticket
-                  </Button>
-                }
-              />
-            )
-          ) : (
-            tickets && (
-              // Previous results stay fully visible while new ones load (skill §4). No dimming:
-              // 60% opacity pushed secondary text below AA contrast (axe, Phase 6 review).
-              <div aria-busy={refreshing}>
-                <TicketList tickets={tickets} />
-                {meta?.truncated && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Showing the {formatNumber(meta.limit)} most recently updated. Refine your search
-                    to see others.
-                  </p>
-                )}
-              </div>
-            )
-          )}
-        </section>
+              tickets && (
+                // Previous results stay fully visible while new ones load (skill §4). No dimming:
+                // 60% opacity pushed secondary text below AA contrast (axe, Phase 6 review).
+                <div aria-busy={refreshing}>
+                  <TicketList
+                    tickets={tickets}
+                    // A short, unfiltered list invites the next ticket instead of ending abruptly.
+                    footer={
+                      !hasFilters && total < 3 ? (
+                        <button
+                          type="button"
+                          onClick={() => setTicketOpen(true)}
+                          className="flex w-full items-center justify-center gap-2 border-t border-dashed px-4 py-3 font-medium text-primary hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset"
+                        >
+                          <Plus className="size-4" aria-hidden /> Add another ticket
+                        </button>
+                      ) : undefined
+                    }
+                  />
+                  {meta?.truncated && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Showing the {formatNumber(meta.limit)} most recently updated. Refine your
+                      search to see others.
+                    </p>
+                  )}
+                </div>
+              )
+            )}
+          </section>
+        </div>
 
         {p.githubRepo && (
-          <aside className="min-w-0 lg:sticky lg:top-6">
+          <aside className="min-w-0 md:sticky md:top-6">
             <RepositoryInsights projectId={projectId} />
           </aside>
         )}

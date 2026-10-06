@@ -44,7 +44,7 @@ test('the three core tasks work with the keyboard alone', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Web Platform' })).toBeVisible()
   await page.keyboard.press('/')
   await page.keyboard.type('login')
-  await expect(page.getByTestId('ticket-list').getByRole('link')).toHaveCount(1)
+  await expect(page.getByTestId('ticket-row')).toHaveCount(1)
   await tabTo(page, /Fix login redirect loop/)
   await page.keyboard.press('Enter')
   await expect(
@@ -69,5 +69,5 @@ test('the three core tasks work with the keyboard alone', async ({ page }) => {
   await tabTo(page, /Web Platform/)
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/q=login/)
-  await expect(page.getByTestId('ticket-list').getByRole('link').first()).toContainText('Done')
+  await expect(page.getByTestId('ticket-row').first()).toContainText('Done')
 })

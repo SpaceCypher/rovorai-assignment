@@ -33,12 +33,12 @@ async function openProject(page: Page, name: string) {
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
 }
 
-const rows = (page: Page) => page.getByTestId('ticket-list').getByRole('link')
+const rows = (page: Page) => page.getByTestId('ticket-row')
 const count = (page: Page, status: string) =>
   page
     .getByRole('region', { name: 'Ticket counts for the whole project' })
-    .locator('dl > div', { hasText: status })
-    .locator('dd')
+    .getByRole('button', { name: new RegExp(`^Show only ${status} tickets`) })
+    .locator('[data-count]')
 
 test('project page shows summary, all tickets and repository insights', async ({ page }) => {
   const external: string[] = []
@@ -49,7 +49,7 @@ test('project page shows summary, all tickets and repository insights', async ({
   await expect(rows(page)).toHaveCount(7)
   const insights = page.getByRole('region', { name: 'Repository insights' })
   await expect(insights.getByText('143.2K')).toBeVisible()
-  await expect(insights.getByText('Open issues & PRs')).toBeVisible()
+  await expect(insights.getByText('Issues & PRs', { exact: true })).toBeVisible()
   await expect(insights.getByRole('link', { name: /vercel\/next\.js/ })).toHaveAttribute(
     'rel',
     'noopener noreferrer',
@@ -167,8 +167,7 @@ test('projects without a repository: full-width list, and "Connect" opens the re
 test('edit project: rename shows in the header and on the dashboard', async ({ page }) => {
   await mockInsights(page)
   await openProject(page, 'Internal Tools')
-  await page.getByRole('button', { name: 'Project actions' }).click()
-  await page.getByRole('menuitem', { name: 'Edit project' }).click()
+  await page.getByRole('button', { name: 'Edit project' }).click()
   const dialog = page.getByRole('dialog', { name: 'Edit project' })
   await expect(dialog.getByLabel('Name')).toHaveValue('Internal Tools')
   await dialog.getByLabel('Name').fill('Ops Tooling')
@@ -182,8 +181,7 @@ test('edit project: rename shows in the header and on the dashboard', async ({ p
 test('delete project requires typing its name, then returns to the dashboard', async ({ page }) => {
   await mockInsights(page)
   await openProject(page, 'Data Layer')
-  await page.getByRole('button', { name: 'Project actions' }).click()
-  await page.getByRole('menuitem', { name: 'Delete project' }).click()
+  await page.getByRole('button', { name: 'Delete project' }).click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toContainText('6 tickets')
   const confirm = dialog.getByRole('button', { name: 'Delete project' })
@@ -200,4 +198,20 @@ test('unknown project id shows a not-found state', async ({ page }) => {
   await expect(page.getByText('Project not found')).toBeVisible()
   await page.goto('/projects/not-a-uuid')
   await expect(page.getByText('Project not found')).toBeVisible()
+})
+
+test('count tiles filter the list; clicking the active tile clears it', async ({ page }) => {
+  await openProject(page, 'Web Platform')
+  const doneTile = page.getByRole('button', { name: /Show only Done tickets/ })
+  await doneTile.click()
+  await expect(doneTile).toHaveAttribute('aria-pressed', 'true')
+  await expect(page).toHaveURL(/status=done/)
+  await expect(rows(page)).toHaveCount(2)
+  // Same state as the chips: the Done chip is pressed too.
+  await expect(
+    page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: 'Done' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await doneTile.click()
+  await expect(doneTile).toHaveAttribute('aria-pressed', 'false')
+  await expect(rows(page)).toHaveCount(7)
 })

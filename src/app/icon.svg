@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- App mark (the header's kanban glyph) in the brand indigo, white strokes for legibility at 16px. -->
+  <rect width="32" height="32" rx="7" fill="#474fb6"/>
+  <path d="M11 9v10M16 9v6M21 9v13" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+</svg>

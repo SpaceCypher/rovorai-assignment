@@ -42,7 +42,7 @@ function Metric({
         <Icon className="size-3.5 shrink-0" aria-hidden />
         {label}
       </dt>
-      <dd className="tabular truncate text-base font-semibold" title={full ?? value}>
+      <dd className="tabular truncate text-2xl font-semibold" title={full ?? value}>
         {value}
       </dd>
     </div>
@@ -64,7 +64,7 @@ function Detail({
         <Icon className="size-3.5 shrink-0" aria-hidden />
         {label}
       </dt>
-      <dd className="min-w-0 truncate text-right">{children}</dd>
+      <dd className="min-w-0 truncate text-right font-medium">{children}</dd>
     </div>
   )
 }
@@ -76,7 +76,7 @@ function InsightsBody({ insights }: { insights: RepoInsights }) {
       <dl className="grid grid-cols-2 gap-2">
         <Metric icon={Star} label="Stars" {...count(insights.stars)} />
         <Metric icon={GitFork} label="Forks" {...count(insights.forks)} />
-        <Metric icon={CircleDot} label="Open issues & PRs" {...count(insights.openIssuesAndPrs)} />
+        <Metric icon={CircleDot} label="Issues & PRs" {...count(insights.openIssuesAndPrs)} />
         <Metric icon={Eye} label="Watchers" {...count(insights.watchers)} />
       </dl>
       <dl className="divide-y">
@@ -85,7 +85,7 @@ function InsightsBody({ insights }: { insights: RepoInsights }) {
         <Detail icon={Clock} label="Last updated">
           {insights.pushedAt ? (
             <span title="Last code push to the repository">
-              <TimeAgo iso={insights.pushedAt} prefix="pushed" />
+              <TimeAgo iso={insights.pushedAt} />
             </span>
           ) : (
             'No pushes yet'

@@ -39,7 +39,7 @@ function Chip({
       aria-pressed={pressed}
       onClick={onToggle}
       className={cn(
-        'inline-flex h-8 items-center rounded-full border px-3 text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
+        'inline-flex h-9 items-center rounded-full border px-3.5 text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
         pressed
           ? 'border-primary bg-primary/10 font-medium'
           : 'border-border bg-card hover:bg-muted',
@@ -48,6 +48,13 @@ function Chip({
       {children}
     </button>
   )
+}
+
+// Same AA-checked text tones as the project summary card.
+const STATUS_TEXT: Record<TicketStatus, string> = {
+  todo: 'text-foreground',
+  in_progress: 'text-status-progress-fg',
+  done: 'text-status-done-fg',
 }
 
 const toggle = <T,>(list: T[], value: T) =>
@@ -92,34 +99,37 @@ export function TicketFilters({ filters, onChange, onClear, hasFilters }: Ticket
   }, [])
 
   return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          ref={inputRef}
-          type="search"
-          aria-label="Search tickets"
-          placeholder="Search title and description"
-          value={text}
-          maxLength={LIMITS.searchQuery}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && text) {
-              e.preventDefault()
-              setText('')
-            }
-          }}
-          className="h-9 pr-10 pl-9"
-        />
-        <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-xs text-muted-foreground sm:block">
-          /
-        </kbd>
-      </div>
+    // One row: search grows, chips sit beside it, wrapping as a unit on narrow screens.
+    // Container query: one row when there's room (full-width page); otherwise search gets its own
+    // row and the chips sit together below it, instead of wrapping mid-group.
+    <div className="@container">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full @4xl:w-auto @4xl:min-w-56 @4xl:flex-1">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            ref={inputRef}
+            type="search"
+            aria-label="Search tickets"
+            placeholder="Search title and description"
+            value={text}
+            maxLength={LIMITS.searchQuery}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && text) {
+                e.preventDefault()
+                setText('')
+              }
+            }}
+            className="h-9 pr-10 pl-9"
+          />
+          <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-xs text-muted-foreground sm:block">
+            /
+          </kbd>
+        </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1.5">
           {TICKET_STATUSES.map((status: TicketStatus) => (
             <Chip
@@ -127,10 +137,12 @@ export function TicketFilters({ filters, onChange, onClear, hasFilters }: Ticket
               pressed={filters.status.includes(status)}
               onToggle={() => onChange({ status: toggle(filters.status, status) })}
             >
-              <StatusBadge status={status} />
+              <StatusBadge status={status} className={STATUS_TEXT[status]} />
             </Chip>
           ))}
         </div>
+        {/* Only where all chips fit on one line; otherwise it would strand at a wrap. */}
+        <span className="hidden h-6 w-px bg-border @xl:block" aria-hidden />
         <div role="group" aria-label="Filter by priority" className="flex flex-wrap gap-1.5">
           {TICKET_PRIORITIES.map((priority: TicketPriority) => (
             <Chip

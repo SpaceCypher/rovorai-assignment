@@ -1,7 +1,7 @@
 'use client'
 
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FileQuestion, MoreHorizontal, Trash2 } from 'lucide-react'
+import { ArrowLeft, FileQuestion, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -9,12 +9,6 @@ import { PageHeader } from '@/components/page-header'
 import { EmptyState, ErrorState } from '@/components/states'
 import { PriorityBadge, StatusBadge } from '@/components/ticket-badges'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { ApiError } from '@/lib/api-client'
 import { formatAbsolute } from '@/lib/format'
 import { projectHref as lastProjectHref } from '@/lib/last-project-view'
@@ -125,18 +119,13 @@ export function TicketView({ ticketId }: { ticketId: string }) {
           </span>
         }
         actions={
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Ticket actions">
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
-                <Trash2 /> Delete ticket
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="outline"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 /> Delete ticket
+          </Button>
         }
       />
 

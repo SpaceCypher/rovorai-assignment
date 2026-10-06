@@ -1,8 +1,7 @@
 'use client'
 
-import { ArrowRight, FolderGit, Plus } from 'lucide-react'
+import { ArrowRight, FolderGit, GitBranch, Plus } from 'lucide-react'
 import Link from 'next/link'
-import { GithubIcon } from '@/components/github-icon'
 import { PriorityBadge, StatusIcon } from '@/components/ticket-badges'
 import { TimeAgo } from '@/components/time-ago'
 import { Button } from '@/components/ui/button'
@@ -20,6 +19,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, onCreateTicket }: ProjectCardProps) {
   const href = `/projects/${project.id}`
+  const { done, total } = project.ticketCounts
   return (
     <Card
       className="flex flex-col gap-0 py-0"
@@ -62,7 +62,7 @@ export function ProjectCard({ project, onCreateTicket }: ProjectCardProps) {
         {/* Always one line, so cards side by side keep their counts and lists aligned. */}
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {project.githubRepo ? (
-            <GithubIcon className="size-3.5 shrink-0" />
+            <GitBranch className="size-3.5 shrink-0" aria-hidden />
           ) : (
             <FolderGit className="size-3.5 shrink-0" aria-hidden />
           )}
@@ -78,11 +78,42 @@ export function ProjectCard({ project, onCreateTicket }: ProjectCardProps) {
 
       <CardContent className="flex flex-1 flex-col gap-4 px-5 pb-4">
         <StatusCounts counts={project.ticketCounts} />
+        {total > 0 && (
+          // Done/total at a glance: a bar reads faster than three numbers (PDF §1 "useful summary").
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Progress</span>
+              <span className="tabular">
+                {formatNumber(done)} of {formatNumber(total)} done
+              </span>
+            </div>
+            <div
+              role="progressbar"
+              aria-label={`${project.name} progress`}
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-valuenow={done}
+              aria-valuetext={`${done} of ${total} tickets done`}
+              className="h-1.5 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-status-done"
+                style={{ width: `${(done / total) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         <section aria-label="Recently updated tickets" className="flex-1">
           <h3 className="mb-1.5 text-xs font-medium text-muted-foreground">Recently updated</h3>
           {project.recentTickets.length === 0 ? (
-            <p className="py-2 text-muted-foreground">No tickets yet.</p>
+            // Empty state offers the next step instead of leaving half the card blank (skill §4).
+            <div className="flex flex-col items-start gap-2 py-1">
+              <p className="text-muted-foreground">No tickets yet.</p>
+              <Button variant="outline" size="sm" onClick={() => onCreateTicket(project)}>
+                <Plus /> Create the first ticket
+              </Button>
+            </div>
           ) : (
             <ul className="-mx-2">
               {project.recentTickets.map((ticket) => (

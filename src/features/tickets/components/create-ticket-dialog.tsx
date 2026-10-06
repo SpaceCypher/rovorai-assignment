@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { applyServerErrors } from '@/lib/form-errors'
+import { modEnterHint, submitOnModEnter } from '@/lib/keyboard'
 import { createTicketSchema } from '@/shared/schemas/ticket'
 import { useCreateTicket } from '../hooks'
 import { TicketFields, type TicketFormInput, type TicketFormOutput } from './ticket-fields'
@@ -69,7 +70,7 @@ export function CreateTicketDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <form onSubmit={onSubmit} noValidate className="grid gap-6">
+        <form onKeyDown={submitOnModEnter} onSubmit={onSubmit} noValidate className="grid gap-6">
           <DialogHeader>
             <DialogTitle>New ticket</DialogTitle>
             <DialogDescription className="truncate">in {projectName}</DialogDescription>
@@ -86,7 +87,7 @@ export function CreateTicketDialog({
                 Cancel
               </Button>
             </DialogClose>
-            <SubmitButton pending={create.isPending} pendingLabel="Creating…">
+            <SubmitButton {...modEnterHint} pending={create.isPending} pendingLabel="Creating…">
               Create ticket
             </SubmitButton>
           </DialogFooter>
