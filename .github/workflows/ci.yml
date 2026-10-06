@@ -13,9 +13,22 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rovor
+          POSTGRES_PASSWORD: rovor
+          POSTGRES_DB: rovor_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rovor -d rovor_test"
+          --health-interval 2s --health-timeout 3s --health-retries 15
     env:
-      # Build-time placeholder; no DB connection is made during the Phase 0 build.
-      DATABASE_URL: postgres://rovor:rovor@localhost:5432/rovor
+      # `next build` imports route modules (env is validated) but opens no DB connection.
+      DATABASE_URL: postgres://rovor:rovor@localhost:5432/rovor_test
+      # Integration tests migrate this database themselves and truncate it between tests.
+      DATABASE_URL_TEST: postgres://rovor:rovor@localhost:5432/rovor_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4 # version read from package.json "packageManager"
@@ -29,3 +42,38 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  e2e:
+    # Playwright against a production build (`next build && next start`) and a real Postgres.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rovor
+          POSTGRES_PASSWORD: rovor
+          POSTGRES_DB: rovor
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rovor -d rovor"
+          --health-interval 2s --health-timeout 3s --health-retries 15
+    env:
+      # Global setup creates and migrates this database; tests reseed it before each test.
+      DATABASE_URL_E2E: postgres://rovor:rovor@localhost:5432/rovor_e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
