@@ -170,7 +170,7 @@ Browser ──fetch JSON──▶ Route Handler (src/app/api/**/route.ts)      t
 
 - **Layers: handler → service → db.** No separate repository layer: services own their Drizzle queries. A repository layer would be a pass-through at this size.
 - **Errors**: services throw typed `AppError(code, httpStatus, message, details?)` subclasses (`NotFoundError`, `ConflictError`, `ValidationError`, `UpstreamError`). `withApi()` maps them; anything else → 500 `INTERNAL_ERROR` + logged stack.
-- **Runtime**: Node.js runtime for all route handlers (`export const runtime = 'nodejs'`; postgres.js needs TCP). `export const dynamic = 'force-dynamic'` on API routes so nothing is statically cached.
+- **Runtime**: Node.js (the default; postgres.js needs TCP). Next 16 Route Handlers are uncached by default, so there's no `export const dynamic`. That option is the legacy caching model and is removed under Cache Components (verified in the bundled Next 16 docs). Every API response also sets `Cache-Control: no-store`.
 - **DB client**: one module-level `postgres()` instance per function instance, `max: 5` (assumption: tune after first deploy), `prepare: false` (required by PgBouncer transaction-mode pooling, which Neon's pooled endpoint uses), `idle_timeout: 20`, `connect_timeout: 10`.
 - **Env**: `src/server/env.ts` parses `process.env` with Zod once; import fails fast with a readable message.
 - **`server-only`** imported at the top of every `src/server/**` module, so an accidental import from a client component breaks the build. One exception: `src/server/db/schema.ts`. It has to load outside Next.js (drizzle-kit, the seed script), and it contains only table definitions: no secrets, no connections.
@@ -284,7 +284,7 @@ res = github.get(repo, etag=row?.etag)
 
 - Clock is injected into the service so freshness is unit-testable without sleeping.
 - Concurrent misses: both fetch, both `INSERT … ON CONFLICT DO UPDATE` — idempotent, last write wins. No single-flight lock: at this traffic a duplicate GitHub call is cheaper than the lock's complexity. Revisit if traffic grows.
-- 304 responses do not count against GitHub's primary rate limit per GitHub docs (assumption — confirm in docs during Phase 3), which makes ETag revalidation nearly free.
+- **ETag revalidation saves bandwidth, not quota (verified live 2026-10-06):** an unauthenticated 304 still decremented `x-ratelimit-remaining` (58 → 57). The quota protection comes from the 5-minute cache plus a `GITHUB_TOKEN` in production (5,000 req/h). Whether authenticated 304s are free is unverified.
 - **Rejected**: in-memory `Map` (per-instance, lost on cold start, inconsistent between instances); Next.js `fetch` Data Cache / `"use cache"` (semantics changed across Next 14→16, caches are hard to inspect and test, and error responses + stale-on-error are awkward); Redis/Upstash (extra service and secret for no gain over a table we already have).
 
 ## 12. Validation and error handling
@@ -377,7 +377,7 @@ No `NEXT_PUBLIC_*` variables are needed (the frontend calls same-origin `/api`).
 11. Unicode/emoji in titles and search → `ILIKE` handles; lengths measured in characters by Postgres.
 12. Invalid UUID in URL (`/projects/abc`) → 404 page, not 500.
 13. Ticket edited in two tabs → second save gets 409 conflict banner.
-14. PATCH with no changed fields besides version → 400 (or no-op; decision: 400 `NO_CHANGES` — simpler to reason about).
+14. PATCH with no editable field besides `version` → 400 `VALIDATION_ERROR` ("Provide at least one field to update").
 15. Double-click on Save/Create → single request (button disabled while pending).
 16. Filters in URL with garbage values (`?status=foo`) → UI drops invalid values; API returns 400 if called directly.
 17. Back navigation after edit → refreshed data with filters restored from URL.
@@ -523,17 +523,25 @@ Each decision is recorded in the log below as: question → owning role → deci
 
 ## Decision log
 
-| #   | Question                                                       | Role                                                        | Decision                                                                                                                 | Reason                                                                                                                                                                                                                                 |
-| --- | -------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| L1  | Keep optimistic locking (D8)?                                  | Backend + DB Reviewer, confirmed by Production Gate         | **Keep**                                                                                                                 | Without it, two tabs editing one ticket silently lose an update. It costs one column plus a `WHERE version = $n`. It's the first thing to cut if time runs short (see phase table).                                                    |
-| L2  | Keep the best-effort GitHub existence check on project create? | Backend + DB Reviewer                                       | **Keep, best-effort only**                                                                                               | A confirmed 404 returns 422 and catches typos at the point of entry. If GitHub is down or rate-limited the project is still created, so our write path never depends on GitHub.                                                        |
-| L3  | Neon or Supabase for production Postgres?                      | Production Gate (Infra / Platform)                          | **Neon**                                                                                                                 | Native Vercel integration, a pooled endpoint for serverless functions, and branching for previews. Supabase's auth, storage and realtime would be unused weight.                                                                       |
-| L4  | Build project edit/delete or ticket delete?                    | Product / Requirements Reviewer; **overridden by Sanidhya** | **Yes, built as extended scope (EXT-1…4)**                                                                               | Sanidhya asked for it. The roles' original call ("not required, so skip") was overruled. Product Reviewer condition: build it only after the PDF requirements, and cut it first if time runs short.                                    |
-| L5  | Git setup                                                      | Architect + Production Gate                                 | **Run `git init` and add `.gitignore` in Phase 0.** No commits, no remote, no pushes.                                    | `git init` is local and reversible. Commits and pushes stay behind Sanidhya's explicit go-ahead (global rule). Creating the public GitHub repo is outward-facing and needs Sanidhya's account, so it's an escalation in Phase 9.       |
-| L6  | Delete semantics                                               | Backend + DB Reviewer                                       | **Hard delete. Project delete cascades through the FK. DELETE → 204; missing id → 404, which the UI treats as success.** | No audit or undo is required. Soft delete would add a `deleted_at` filter to every query and every unique index. The cascade makes project delete one atomic statement.                                                                |
-| L7  | Should project edit use optimistic locking too?                | Backend + DB Reviewer                                       | **Yes, add `projects.version`**                                                                                          | It's the same mechanism as tickets, already built and tested once. Two different update semantics would be harder to explain than one.                                                                                                 |
-| L8  | Where do edit and delete live in the UI?                       | Frontend + UX Reviewer                                      | **On the detail pages only. Project edit/delete sits on the project page header; ticket delete on the ticket page.**     | Keeps dashboard cards uncluttered and stops destructive actions sitting next to `+`. Every delete goes through a confirm dialog. Project delete states the ticket count and needs one explicit click on a red "Delete project" button. |
-| L9  | Should a repo change re-run the existence check?               | Backend + DB Reviewer                                       | **Yes, but only when `githubRepo` actually changed**                                                                     | Same rule as create. Unchanged saves never call GitHub.                                                                                                                                                                                |
+| #   | Question                                                           | Role                                                        | Decision                                                                                                                                                                                                                                              | Reason                                                                                                                                                                                                                                                                            |
+| --- | ------------------------------------------------------------------ | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L1  | Keep optimistic locking (D8)?                                      | Backend + DB Reviewer, confirmed by Production Gate         | **Keep**                                                                                                                                                                                                                                              | Without it, two tabs editing one ticket silently lose an update. It costs one column plus a `WHERE version = $n`. It's the first thing to cut if time runs short (see phase table).                                                                                               |
+| L2  | Keep the best-effort GitHub existence check on project create?     | Backend + DB Reviewer                                       | **Keep, best-effort only**                                                                                                                                                                                                                            | A confirmed 404 returns 422 and catches typos at the point of entry. If GitHub is down or rate-limited the project is still created, so our write path never depends on GitHub.                                                                                                   |
+| L3  | Neon or Supabase for production Postgres?                          | Production Gate (Infra / Platform)                          | **Neon**                                                                                                                                                                                                                                              | Native Vercel integration, a pooled endpoint for serverless functions, and branching for previews. Supabase's auth, storage and realtime would be unused weight.                                                                                                                  |
+| L4  | Build project edit/delete or ticket delete?                        | Product / Requirements Reviewer; **overridden by Sanidhya** | **Yes, built as extended scope (EXT-1…4)**                                                                                                                                                                                                            | Sanidhya asked for it. The roles' original call ("not required, so skip") was overruled. Product Reviewer condition: build it only after the PDF requirements, and cut it first if time runs short.                                                                               |
+| L5  | Git setup                                                          | Architect + Production Gate                                 | **Run `git init` and add `.gitignore` in Phase 0.** No commits, no remote, no pushes.                                                                                                                                                                 | `git init` is local and reversible. Commits and pushes stay behind Sanidhya's explicit go-ahead (global rule). Creating the public GitHub repo is outward-facing and needs Sanidhya's account, so it's an escalation in Phase 9.                                                  |
+| L6  | Delete semantics                                                   | Backend + DB Reviewer                                       | **Hard delete. Project delete cascades through the FK. DELETE → 204; missing id → 404, which the UI treats as success.**                                                                                                                              | No audit or undo is required. Soft delete would add a `deleted_at` filter to every query and every unique index. The cascade makes project delete one atomic statement.                                                                                                           |
+| L7  | Should project edit use optimistic locking too?                    | Backend + DB Reviewer                                       | **Yes, add `projects.version`**                                                                                                                                                                                                                       | It's the same mechanism as tickets, already built and tested once. Two different update semantics would be harder to explain than one.                                                                                                                                            |
+| L8  | Where do edit and delete live in the UI?                           | Frontend + UX Reviewer                                      | **On the detail pages only. Project edit/delete sits on the project page header; ticket delete on the ticket page.**                                                                                                                                  | Keeps dashboard cards uncluttered and stops destructive actions sitting next to `+`. Every delete goes through a confirm dialog. Project delete states the ticket count and needs one explicit click on a red "Delete project" button.                                            |
+| L9  | Should a repo change re-run the existence check?                   | Backend + DB Reviewer                                       | **Yes, but only when `githubRepo` actually changed**                                                                                                                                                                                                  | Same rule as create. Unchanged saves never call GitHub.                                                                                                                                                                                                                           |
+| L10 | Dark mode?                                                         | Frontend + UX Reviewer                                      | **Light only, done properly**                                                                                                                                                                                                                         | The app-ui-design skill requires a designed and contrast-checked dark theme, not an inversion. The PDF doesn't ask for one. One theme, all tokens checked against AA, beats two half-checked. `next-themes` was removed.                                                          |
+| L11 | Optimistic updates (skill §5)?                                     | Frontend + UX Reviewer                                      | **No: server-confirmed, then invalidate**                                                                                                                                                                                                             | The PDF says "latest saved state". Local round-trips take tens of ms. It avoids rollback code. Revisit if latency is felt in production.                                                                                                                                          |
+| L12 | Undo vs confirm for deletes (skill §5)?                            | Frontend + UX Reviewer (amends L8)                          | **Confirm dialog. Project delete requires typing the project name.**                                                                                                                                                                                  | Deletes are hard (L6). Undo would need a delayed delete that is lost if the tab closes. The skill allows confirmation for irreversible, high-impact actions and recommends typed confirmation for the most destructive one: a project delete takes its tickets with it.           |
+| L13 | Command palette (skill §3)?                                        | Product Reviewer                                            | **No. Add `/` to focus search instead.**                                                                                                                                                                                                              | Two screens; a palette is scope without value here                                                                                                                                                                                                                                |
+| L14 | Search debounce                                                    | Frontend + UX Reviewer                                      | **200 ms** (was 300 ms)                                                                                                                                                                                                                               | Skill §5. `keepPreviousData` keeps results visible while typing.                                                                                                                                                                                                                  |
+| L15 | Colour palette                                                     | **Sanidhya** (asked to choose from 3 rendered options)      | **A · Warm stone**: a warm sand-grey page, off-white cards, indigo accent                                                                                                                                                                             | The original near-white scheme read as one bright sheet with too little separation between layers. Re-verified: 26/26 contrast pairs pass AA (tiles and hover fills are now checked too), and all 8 axe scans pass.                                                               |
+| L16 | Input style                                                        | **Sanidhya** (3 rendered options)                           | **Clean**: inputs take the card colour, defined by a 3.27:1 border                                                                                                                                                                                    | The gray inputs reported were a bug, not the style: restoring `@custom-variant dark (&:is(.dark *))` stops shadcn's `dark:` styles from applying when the OS is in dark mode. `color-scheme: light` was added, and an e2e regression test runs with `colorScheme: 'dark'`.        |
+| L17 | Empty right column on projects without a repo (raised by Sanidhya) | Frontend + UX Reviewer, Product Reviewer                    | **The insights column renders only when a repo is connected; otherwise the ticket list spans the full width.** The header gains the dashboard's repo line: a GitHub link, or "No repository · Connect", which opens Edit with the repo field focused. | A reserved but empty 20rem column broke the shared right edge with the header actions (skill §4: content, a designed empty state, or nothing). The repo is optional (PDF §8), so it gets a quiet hint rather than a promo card. e2e asserts the full width and the Connect focus. |
 
 ## Pending escalations (Sanidhya)
 
@@ -593,3 +601,195 @@ Each decision is recorded in the log below as: question → owning role → deci
 | P1-4 | Info                         | The seed resets only local hosts; `--if-empty` is the only mode allowed against remote databases                                                      | Verified: a remote host is refused with a clear message, and `--if-empty` on a seeded database skips |
 
 **Verdict:** pass. DB-1 stays unchecked until Neon is connected in Phase 9.
+
+### Phase 2 — Backend + Database Reviewer (2026-10-06)
+
+**Evidence:**
+
+- 107 tests: 58 + 12 unit, 39 integration against real Postgres.
+- `pnpm smoke` runs 17/17 checks over HTTP against `next start`.
+- Harness checks:
+  - The integration suite refuses any database whose name doesn't end in `_test`.
+  - Disabling the status filter fails exactly the 2 filter tests.
+  - Changing the search expression fails the index test.
+
+| #    | Severity | Finding                                                                                                                                                                                             | Action                                                                                                                                                                     |
+| ---- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P2-1 | **High** | Found live, not by tests: log redaction keyed on `error.name === 'DrizzleQueryError'`, but the production bundle minifies it to `Error`. Failed-query logs therefore included `params` (user text). | Switched to `instanceof DrizzleQueryError`. Unit test simulates a minified name. Re-verified on a production build with the DB stopped: user text is absent from the logs. |
+| P2-2 | Medium   | DB outage returned 500 `INTERNAL_ERROR`, which isn't retryable from the UI's point of view                                                                                                          | Connection errors (`ECONNREFUSED`/`ECONNRESET`/`CONNECT_TIMEOUT`/`57P01`/`53300`…) now map to 503 `DB_UNAVAILABLE` and are logged. Verified live.                          |
+| P2-3 | Medium   | "Search uses the trigram index" was a comment, not a check                                                                                                                                          | Extracted `ticketSearchCondition`. A test EXPLAINs the generated SQL and asserts `tickets_search_trgm_idx`.                                                                |
+| P2-4 | Medium   | Concurrent saves with the same version were untested                                                                                                                                                | Test fires two PATCHes at once: exactly one 200 and one 409 (Postgres re-checks `WHERE version` after the row lock).                                                       |
+| P2-5 | Low      | LIKE escaping with `\\` risked the same template-literal bug as P1-2                                                                                                                                | `!` is the escape character, and the tests search literal `%`, `_` and `!`                                                                                                 |
+| P2-6 | Info     | `export const dynamic` from the original plan is legacy in Next 16                                                                                                                                  | Not used; §6 updated                                                                                                                                                       |
+| P2-7 | Info     | CI had no database                                                                                                                                                                                  | CI now runs a Postgres 16 service; the integration tests run in CI                                                                                                         |
+
+**Verdict:** pass.
+
+### Phase 3 — Backend + Database Reviewer (2026-10-06)
+
+**Evidence:**
+
+- 127 tests in total. 20 new integration tests cover:
+  - TTL with an injected clock;
+  - ETag/304 revalidation;
+  - negative caching, stale-on-error, and rate-limit/5xx/timeout/bad-payload mapping;
+  - the create/edit repo check and cache warming.
+- Mutation check: forcing every lookup to count as a miss fails 6 tests.
+- Live against GitHub (production build): first call `cached:false`, second `cached:true` with the same `fetchedAt`. Watchers = `subscribers_count` (1630), not stars (143216). A nonexistent repo on create → 422 `REPO_NOT_FOUND`.
+
+| #    | Severity | Finding                                                                                                                          | Action                                                                                                                                                                               |
+| ---- | -------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P3-1 | Medium   | The planned assumption "304s don't count against the rate limit" is **false** for unauthenticated requests (verified live)       | §11 corrected. Production relies on the cache plus `GITHUB_TOKEN`; ETag is kept for bandwidth.                                                                                       |
+| P3-2 | Medium   | Integration tests could silently hit the real GitHub API (the Phase 2 tests create projects with repos)                          | Global fake `fetch` in the integration setup. Unscripted repos fail as network errors, and non-GitHub hosts throw. Every call is recorded, so tests assert zero calls on cache hits. |
+| P3-3 | Low      | GitHub payloads are external input                                                                                               | Response validated with Zod. `html_url` must start with `https://github.com/`, otherwise it is rebuilt from `full_name` (blocks `javascript:` links).                                |
+| P3-4 | Low      | Cached JSON could predate a shape change from an older deploy                                                                    | Read path validates the payload; a mismatch counts as a cache miss                                                                                                                   |
+| P3-5 | Info     | Concurrent cache misses each call GitHub (no single-flight lock)                                                                 | Accepted. The upsert is idempotent; revisit at real traffic                                                                                                                          |
+| P3-6 | Info     | `not_found` rows from typo'd repos accumulate                                                                                    | Accepted at this scale; noted for README limitations                                                                                                                                 |
+| P3-7 | Process  | A stale `next-server` on :3100 served old code during one live check (`pkill -f "next start"` doesn't match the renamed process) | Re-verified after killing by port. The Phase 2 live verification was valid: its output contains a message that exists only in the fixed code.                                        |
+
+**Verdict:** pass.
+
+### Phase 4 — Frontend + UX Reviewer (2026-10-06), using the `app-ui-design` skill
+
+**Evidence:**
+
+- Gate green; 141 tests. 14 new client-layer unit tests cover:
+  - the invalidation map, run against a real `QueryClient`;
+  - API error parsing, including network errors, non-JSON error pages and 404-on-delete;
+  - lenient URL filters.
+- **Contrast:** 17/17 token pairs pass WCAG AA with an OKLCH→sRGB checker (self-test: black/white = 21.0, OKLCH red → [255,0,0]). Muted text 5.4–6.0:1, primary label 5.55:1, input border 3.11:1 (1.4.11).
+- **Screenshots** (headless Chromium, 375px and 1280px): no horizontal overflow. The first Tab focuses "Skip to content". The only console errors are the expected document 404s.
+
+| #    | Severity | Finding                                                                                 | Action                                                                                      |
+| ---- | -------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| P4-1 | Medium   | The skip link rendered without padding: Tailwind's `not-sr-only` resets padding         | `focus:px-3 focus:py-2`. Re-screenshotted.                                                  |
+| P4-2 | Medium   | The `react-hooks/set-state-in-effect` lint caught a sync `setState` in `useDelayedFlag` | State now resets in the effect's cleanup                                                    |
+| P4-3 | Low      | The formatter test assumed en-US, but the host locale is en-IN ("1.4L")                 | Locale is a parameter, defaulting to the viewer's. Tests pin it and cover en-IN explicitly. |
+| P4-4 | Low      | shadcn's Sonner pulled in `next-themes`                                                 | Removed (L10)                                                                               |
+| P4-5 | Low      | Ticket changes would have refetched GitHub insights through prefix invalidation         | `invalidate.afterTicketChange` targets exact keys; a unit test asserts insights stay fresh  |
+| P4-6 | Process  | The Chrome extension didn't respond (2 attempts)                                        | Screenshots taken with Playwright headless Chromium instead (already planned for e2e)       |
+
+**Verdict:** pass.
+
+### Phase 5 — Frontend + UX Reviewer (2026-10-06), using the `app-ui-design` skill §16 verify pass
+
+**Evidence:**
+
+- Playwright, against a production build and its own reseeded `rovor_e2e` database: 7/7 pass.
+  - **Dashboard:** counts, recent tickets and links.
+  - **Create project:** inline validation, the server's duplicate-name error on the field, and the card appearing.
+  - **`+` on a card:** creates a ticket, and the card updates with **no page reload** (asserted with a window marker).
+  - **Drafts:** survive an accidental close.
+  - **axe:** WCAG 2.2 A/AA on the dashboard and both dialogs.
+- **State pass:** loading, empty, error, overflow (10,000 tickets, unbroken 80-character words) and real data, at 375/768/1280px, with no horizontal overflow. Tab order: skip link → brand → New project → card links.
+
+| #    | Severity        | Finding                                                                                                                                              | Action                                                                                                             |
+| ---- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| P5-1 | **High (a11y)** | Status/Priority selects had **no accessible name**. `FormField` cloned `id`/aria onto Radix `<Select>`, which renders no DOM element. Caught by e2e. | `FormField` accepts a render function; the wiring is spread onto `SelectTrigger`                                   |
+| P5-2 | Medium (a11y)   | axe `color-contrast` on the hovered primary button: shadcn's `hover:bg-primary/80` gives 3.76:1                                                      | Solid `--primary-hover` token (6.92:1) on button and badge. The contrast checker now covers the hover pair.        |
+| P5-3 | Medium          | Card ticket rows showed status by **colour alone** (skill §6)                                                                                        | Shape-coded `StatusIcon` (circle / dashed / check) used everywhere, with an sr-only label where no text is visible |
+| P5-4 | Low             | The `SignalLow` priority icon rendered as a stray ".," at text size                                                                                  | Arrow icons (↑ = ↓)                                                                                                |
+| P5-5 | Low             | On mobile, "In Progress" wrapped and misaligned the count numbers                                                                                    | Tiles are flex columns with justify-between                                                                        |
+| P5-6 | Low             | Overflow: "10000" ungrouped; truncated text had no way to read it                                                                                    | `formatNumber`, plus `title` on truncated names, titles and repos                                                  |
+| P5-7 | Low             | Empty dashboard had two "New project" primary buttons (skill §3)                                                                                     | The header action hides when the empty state carries it                                                            |
+| P5-8 | Low             | A dashboard ticket draft was lost on close (skill §7)                                                                                                | The dialog stays mounted for the last project used                                                                 |
+| P5-9 | Process         | Two silent `str.replace` misses after a Prettier reformat (caught by lint)                                                                           | Switched to the Edit tool / asserted replacements                                                                  |
+
+**Verdict:** pass.
+
+### Phase 6 — Frontend + UX Reviewer (2026-10-06), using the `app-ui-design` skill
+
+**Evidence:**
+
+- **e2e:** 19/19 pass against a production build. 9 project-page specs cover:
+  - search and filters: server-side, combined, in the URL and restored on reload, clear and empty states;
+  - `/` to focus search;
+  - creating a ticket from the page, with the list and counts updating in place;
+  - insights errors staying inside the panel, and no panel when a project has no repo;
+  - rename reflected on the dashboard;
+  - type-to-confirm delete returning to a dashboard with one card fewer;
+  - not-found for an unknown id and a malformed id;
+  - the browser making **zero** requests to non-localhost hosts (GH-2).
+- **axe:** 7 scans, now including the project page, the open actions menu and the delete dialog.
+- **State screenshots:** real data (live GitHub), stale insights, insights loading, no-match and empty, at 375 and 1280px, with no horizontal overflow.
+
+| #    | Severity      | Finding                                                                                            | Action                                                                                                                                                                   |
+| ---- | ------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P6-1 | Medium (a11y) | Dimming the list to 60% during refetch pushed muted text, priorities and timestamps below AA (axe) | No dimming. Old results stay at full contrast, with a spinner and `aria-busy` (skill §4 asks only for a subtle indicator).                                               |
+| P6-2 | Medium (a11y) | The Radix modal dropdown aria-hid the page while it stayed focusable (`aria-hidden-focus`)         | `modal={false}` on the actions menu; keyboard and Escape behaviour unchanged                                                                                             |
+| P6-3 | Low           | An axe scan caught the menu mid fade-out                                                           | `expectNoViolations` waits for animations to settle, and the open menu gets its own scan at rest                                                                         |
+| P6-4 | Design        | The search box and the URL can disagree while the debounce is pending                              | The box adopts the URL value only when it changed for another reason (Clear, Back). It is never overwritten by its own debounced write, so no typed characters are lost. |
+| P6-5 | Design        | A 409 on project edit must not lose the user's work                                                | `ConflictBanner`: "Overwrite with mine" or "Load latest". Reused for tickets in Phase 7.                                                                                 |
+| P6-6 | Design        | A delete must not refetch the deleted project                                                      | Queries are disabled first, then `router.replace('/')`, then the cache is removed; e2e asserts no "Project not found" flash                                              |
+
+**Verdict:** pass.
+
+### Phase 7 — Frontend + UX Reviewer (2026-10-06), using the `app-ui-design` skill
+
+**Evidence:**
+
+- **e2e:** 25/25 pass against a production build. The 5 ticket specs cover:
+  - **TKT-5 end to end:** filter the project to Todo → open a ticket → rename it and set it to Done → Save → browser Back. The URL still has `status=todo`, the ticket has left the Todo list, and the counts went from Todo 3→2 and Done 2→3. The dashboard card shows the new counts and the renamed ticket first in "Recently updated". **No full reload** (window marker).
+  - inline validation, plus "Discard changes" restoring a clean form;
+  - a concurrent edit via the API producing the conflict banner, with the user's text kept; both "Load latest" and "Overwrite with mine" verified;
+  - delete returning to the project page with the list and counts updated, and no "not found" flash;
+  - an unknown id showing not-found.
+- **axe:** 8 scans, now including the ticket page with the conflict banner showing.
+- **Screenshots:** normal, conflict and overflow (200-character unbroken title, 600-word description) at 375 and 1280px, with no horizontal overflow.
+
+| #    | Severity         | Finding                                                                                                                                      | Action                                                                                                                                                                                                                      |
+| ---- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P7-1 | Medium           | shadcn `Textarea` uses `field-sizing: content`, so a 600-word description grew to several screens and pushed Status/Priority/Save off-screen | Capped at `max-h-80` with internal scroll                                                                                                                                                                                   |
+| P7-2 | Low              | A 200-character unbroken title took 8 lines of the mobile header                                                                             | `line-clamp-3` with `title`; the full text is in the Title field                                                                                                                                                            |
+| P7-3 | Test bug         | `page.url()` was read before the client-side navigation finished, so the project id was PATCHed as a ticket (404)                            | `waitForURL(/\/tickets\/…/)` before reading the id                                                                                                                                                                          |
+| P7-4 | Design           | Save must not misfire on a clean form, and edits must not be lost silently                                                                   | Save is disabled until the form is dirty; "Unsaved changes" is announced through `aria-live`; `beforeunload` guards reload and tab close; the editor is keyed by `version`, so each saved or loaded version resets the form |
+| P7-5 | Known limitation | In-app link navigation can't be intercepted in the App Router, so leaving a dirty form via a link doesn't warn                               | Accepted. Reload and close are guarded, and the README will list this.                                                                                                                                                      |
+
+**Verdict:** pass.
+
+### Phase 8 — Frontend + UX Reviewer + Production Gate (2026-10-06): `app-ui-design` §16 verify pass, across the app
+
+**Evidence:**
+
+- **NFR audit:**
+  - no `any`, `@ts-ignore`, `@ts-expect-error` or `eslint-disable` in `src/`;
+  - no non-API code imports `@/server`, and the boundary is now **an ESLint rule**, proven by a deliberate probe import that failed lint;
+  - only `.env.example` is tracked, there are no secret-shaped strings and no `NEXT_PUBLIC_` variables;
+  - the GitHub timeout is 5 s.
+- **Keyboard pass:** a new e2e test completes all 3 core tasks with no mouse (create a ticket from a card; search, open, change status and save; return to the filtered list). It passed 3 runs out of 3.
+- **Speed pass:** in-page click → first-feedback time under Lighthouse "slow 4G" (150 ms RTT) plus 4× CPU, 3 runs each:
+
+  | Interaction                          | Before    | After    |
+  | ------------------------------------ | --------- | -------- |
+  | filter chip → pressed                | ~200 ms   | 14–22 ms |
+  | "Open project" → first visual change | ~695 ms   | 25–36 ms |
+  | open dialog                          | 85–117 ms | 50–69 ms |
+  | submit → pending                     | 30–52 ms  | 16–20 ms |
+  | search keystroke                     | 8–12 ms   | 4–7 ms   |
+
+  Every interaction is now under the skill's 100 ms budget.
+
+- **Lighthouse 13.5** (mobile emulation, `next start`):
+
+  | Page      | Accessibility | Best practices | Performance | LCP   | TBT    | CLS   |
+  | --------- | ------------- | -------------- | ----------- | ----- | ------ | ----- |
+  | dashboard | 100           | 100            | 84          | 3.9 s | 230 ms | 0     |
+  | project   | 100           | 100            | 79          | 4.2 s | 270 ms | 0.081 |
+  | ticket    | 100           | 100            | 77          | 4.0 s | 420 ms | 0     |
+
+- **Viewports:** 375, 768, 1280 and 1920 px across all pages, with no horizontal overflow anywhere.
+- **e2e:** 28/28, now including offline, server-error-on-save and keyboard-only. **axe:** 8 scans, all clean. CI gains an `e2e` job.
+
+| #    | Severity                 | Finding                                                                                                                           | Action                                                                                                                                                                                                             |
+| ---- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P8-1 | **High**                 | Offline submits hung: TanStack's default `networkMode: 'online'` _pauses_ mutations, leaving "Creating…" spinning forever         | Mutations use `networkMode: 'always'` and fail fast with "Can't reach the server"; the draft is kept. `OfflineBanner` added (`useSyncExternalStore`). e2e: offline → error → reconnect → save succeeds.            |
+| P8-2 | Medium (perf)            | Filter chip feedback took ~200 ms: `router.replace` re-fetched the page payload on every filter change and debounced search write | Native `history.replaceState`, which Next 16 syncs into `useSearchParams` (verified in the bundled docs). Now 14–22 ms, with no server round trip.                                                                 |
+| P8-3 | Medium (perf)            | Navigating to a project showed nothing for ~695 ms                                                                                | Route `loading.tsx` with a layout-shaped skeleton; first visual change in 25–36 ms                                                                                                                                 |
+| P8-4 | Medium (UX)              | The "← Project" link on a ticket dropped the project's filters; only browser Back kept them                                       | The project view remembers its filter string per project in `sessionStorage` (wrapped in try/catch, convenience only), and back links restore it. Keyboard e2e asserts it.                                         |
+| P8-5 | Low                      | Cards side by side misaligned when one had a repo line and one didn't                                                             | The repo line always renders ("No repository", muted)                                                                                                                                                              |
+| P8-6 | Low                      | `tickets/search.ts` lacked `server-only`                                                                                          | Added                                                                                                                                                                                                              |
+| P8-7 | Not a bug (investigated) | The keyboard test seemed to show Radix Select ignoring arrow keys                                                                 | A trace showed Radix ignores keys for a frame or two while the listbox positions itself. At human speed it works (Enter and Space both commit). The test now watches the highlight instead of counting keypresses. |
+| P8-8 | Test race                | With route loading UI the URL changes before the ticket loads, so the conflict tests' "other user" PATCH landed first             | The tests wait for the editor to load before simulating the other user (the realistic order)                                                                                                                       |
+| P8-9 | Accepted (D4 trade-off)  | Lighthouse LCP is about 4 s on simulated slow 4G: data is fetched client-side after hydration                                     | Documented with numbers. The fix is server prefetch plus TanStack `HydrationBoundary`, which reverses D4; logged as the first optional post-deploy improvement.                                                    |
+
+**Verdict:** pass.
