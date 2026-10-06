@@ -166,8 +166,8 @@ Each one goes under "Known limitations" in the README. Project edit/delete and t
 
 | ID        | Item                                                     | Done when                                                                                |
 | --------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| [ ] SUB-1 | Git repository link with complete source                 | Public GitHub repo, `main` builds from a clean clone                                     |
-| [ ] SUB-2 | README with complete local run instructions              | A fresh clone following only the README reaches a working app                            |
+| [x] SUB-1 | Git repository link with complete source                 | Public GitHub repo, `main` builds from a clean clone                                     |
+| [x] SUB-2 | README with complete local run instructions              | A fresh clone following only the README reaches a working app                            |
 | [x] SUB-3 | Live Vercel deployment link                              | Production URL works end-to-end (create project, create/edit ticket, search, insights)   |
 | [x] SUB-4 | Separate backend hosting connected (if any)              | N/A by design — backend ships inside the same Vercel deployment; DB on Neon is connected |
 | [x] SUB-5 | Assumptions, known limitations, incomplete functionality | README section, kept honest and current                                                  |
@@ -175,14 +175,14 @@ Each one goes under "Known limitations" in the README. Project edit/delete and t
 
 ### README must explain (PDF "README requirements")
 
-- [ ] RM-1 How to set up and run frontend, backend, and database
-- [ ] RM-2 Overall architecture (diagram + one paragraph)
-- [ ] RM-3 Frontend state and application data handling (TanStack Query, query keys, invalidation, URL state)
-- [ ] RM-4 Database and data modelling approach
-- [ ] RM-5 GitHub integration and caching approach
-- [ ] RM-6 Important technical decisions / trade-offs
-- [ ] RM-7 Which AI tools were used and for what
-- [ ] RM-8 One AI suggestion that was changed/rejected/improved, and why — **must be a real example from this build; Sanidhya to confirm the content, nothing invented**
+- [x] RM-1 How to set up and run frontend, backend, and database
+- [x] RM-2 Overall architecture (diagram + one paragraph)
+- [x] RM-3 Frontend state and application data handling (TanStack Query, query keys, invalidation, URL state)
+- [x] RM-4 Database and data modelling approach
+- [x] RM-5 GitHub integration and caching approach
+- [x] RM-6 Important technical decisions / trade-offs
+- [x] RM-7 Which AI tools were used and for what
+- [x] RM-8 One AI suggestion that was changed/rejected/improved, and why — **must be a real example from this build; Sanidhya to confirm the content, nothing invented**
 
 ---
 

@@ -38,19 +38,22 @@ The seed data has 3 projects and 18 tickets. A few things worth trying:
    - Go to the dashboard: the card shows the new counts too. No page reload happens at any point.
 2. **Search runs on the server.**
    - Press `/` anywhere on a project page and type `login`.
-   - Combine it with the status and priority chips.
+   - Combine it with the status and priority chips, or click a count tile (e.g. **Done**) to show only that status.
    - Filters live in the URL, so reloading or sharing the link keeps them.
-3. **Quick create.** Use **+** on any dashboard card to create a ticket for that project, then watch the card update.
+3. **Quick create.** Use **+** on any dashboard card to create a ticket for that project, then watch the card's
+   counts and progress bar update. In any form, **Ctrl/⌘ + Enter** saves.
 4. **Repository insights.**
    - **Web Platform** and **Data Layer** show stars, forks, open issues and PRs, watchers and last-updated time from
      GitHub.
    - The footer of the panel says when the data was fetched and whether it came from the cache.
    - To try your own, create a project and paste any public repo URL. A repo that doesn't exist is rejected when you
      save.
-5. **Concurrent edits don't overwrite each other.**
+5. **Edit and delete are always visible.** Each ticket row has an **Edit** button (clicking the row works too), and
+   the project header has **Edit project** and **Delete project**.
+6. **Concurrent edits don't overwrite each other.**
    - Open the same ticket in two tabs and save in one.
    - Now save in the other: a banner keeps your text and lets you choose **Overwrite with mine** or **Load latest**.
-6. **Failure states.**
+7. **Failure states.**
    - In DevTools, set the network to **Offline** and try to save: you get a clear error, and your draft is kept.
    - A project id that doesn't exist (e.g. `/projects/00000000-0000-4000-8000-000000000000`) shows a "not found" page.
 
@@ -75,7 +78,7 @@ engineering team, split into fixed roles (defined in
 1. **Requirements before code.** The PDF became [`REQUIREMENTS.md`](REQUIREMENTS.md): every line has an ID, acceptance
    criteria and the test that proves it.
 2. **Architecture before code.** [`ARCHITECTURE.md`](ARCHITECTURE.md) holds the decisions, each with its reason and its
-   cost. Every later question was answered by the role that owns it and logged (decisions L1–L17).
+   cost. Every later question was answered by the role that owns it and logged (decisions L1–L21).
 3. **Phased build with gates.** There were 12 phases. Each ends with a runnable check, with the output shown, followed
    by a review from the owning role. A phase doesn't close until its review passes, and every finding is recorded with a
    severity under "Phase reviews" in `ARCHITECTURE.md`.
@@ -88,6 +91,8 @@ engineering team, split into fixed roles (defined in
 - I rejected the first near-white colour scheme and chose from three rendered alternatives (L15).
 - Testing in my own dark-mode browser, I found gray inputs that no automated test had caught (L16).
 - I flagged dead space on projects without a repository (L17).
+- I reviewed two rounds of UI mockups. The roles adopted the parts with a real job and dropped the decorative ones
+  (L18, L20). I also asked for a polish pass (L19) and for visible Edit/Delete buttons instead of hidden menus (L21).
 
 ### What the gates caught
 
@@ -327,17 +332,18 @@ logged in [`ARCHITECTURE.md`](ARCHITECTURE.md), and the requirement checklist is
 
 ## Testing and quality
 
-- **141 unit + integration tests** (Vitest). Integration tests call the real route handlers against a real Postgres.
+- **143 unit + integration tests** (Vitest). Integration tests call the real route handlers against a real Postgres.
   GitHub is replaced by a fake `fetch` (tests never touch the network), and the cache TTL is tested with a fake clock.
-- **30 end-to-end tests** (Playwright) against a production build, including:
+- **34 end-to-end tests** (Playwright) against a production build, including:
   - the full "edit, press Back, everything is updated, no reload" flow;
   - search and filters surviving reload;
   - conflict resolution, offline behaviour and keyboard-only use;
   - 8 automated accessibility (axe, WCAG 2.2 AA) scans, including one with the OS in dark mode.
 - **CI (GitHub Actions):** format, lint, typecheck, unit and integration tests with a Postgres service, build, and the
   e2e suite.
-- **Measured UX:** under simulated slow 4G with 4× CPU throttling, every click or keypress shows feedback in under 70 ms.
-  Lighthouse: accessibility **100**, best practices **100**, performance 77–84.
+- **Measured UX (final UI):** under simulated slow 4G with 4× CPU throttling, every click or keypress shows feedback
+  in under 90 ms. Lighthouse (mobile): accessibility **100**, best practices **100**, performance 81–87, layout shift
+  ≤ 0.06.
 
 ## Assumptions, known limitations, incomplete functionality
 
@@ -353,6 +359,9 @@ logged in [`ARCHITECTURE.md`](ARCHITECTURE.md), and the requirement checklist is
 
 - No pagination UI. A ticket list returns at most 200 rows and says so when it truncates.
 - No rate limiting on our own API.
+- `pnpm audit`: production dependencies are clean. One dev-only advisory remains (`braces`, reached through Next's ESLint
+  plugin). It has no patched release, and it only ever processes our own lint config. A second dev advisory (`esbuild`
+  via drizzle-kit) was fixed with a pnpm override, and drizzle-kit was verified afterwards.
 - Leaving a page with unsaved edits via an in-app link doesn't warn (Next.js can't intercept App Router navigation).
   Reload and tab close do warn.
 - Cache rows for repos that are no longer used are never cleaned up. That's harmless at this scale.
@@ -363,9 +372,6 @@ logged in [`ARCHITECTURE.md`](ARCHITECTURE.md), and the requirement checklist is
 **Incomplete:** nothing from the PDF. Possible next steps: server prefetch for faster first paint, and a global ticket search.
 
 ## AI usage
-
-<!-- DRAFT: Sanidhya, rewrite in your own words and confirm before submitting. Everything below
-     describes things that actually happened in this build; keep only what you can explain. -->
 
 **Tools:** Claude Code (Claude Opus) as a pair programmer through the whole build. I used it for:
 
