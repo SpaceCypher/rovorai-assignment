@@ -143,7 +143,7 @@ These are delivered after every PDF requirement above. Per the cut order in ARCH
 | [x] NFR-8  | Errors never leak internals                                    | 500 responses carry a generic message + request id; details logged server-side                             |
 | [x] NFR-9  | Observability (lightweight)                                    | Structured JSON logs per request (method, route, status, duration, requestId); `GET /api/health` checks DB |
 | [x] NFR-10 | CI gate                                                        | GitHub Actions: lint, typecheck, unit + integration (Postgres service), build                              |
-| [ ] NFR-11 | Reproducible local setup                                       | `docker compose up -d && pnpm i && pnpm db:migrate && pnpm db:seed && pnpm dev`                            |
+| [x] NFR-11 | Reproducible local setup                                       | `docker compose up -d && pnpm i && pnpm db:migrate && pnpm db:seed && pnpm dev`                            |
 
 ---
 
