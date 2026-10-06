@@ -1,0 +1,11 @@
+.next
+node_modules
+pnpm-lock.yaml
+drizzle/meta
+docs
+coverage
+playwright-report
+test-results
+RovorAI_Engineering_Roles.md
+AGENTS.md
+CLAUDE.md
