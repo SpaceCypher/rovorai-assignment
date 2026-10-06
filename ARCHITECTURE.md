@@ -340,13 +340,13 @@ GitHub repo ──push main──▶ Vercel (Next.js: static assets + Node funct
 
 ## 16. Environment variables and configuration
 
-| Variable                | Where           | Required                 | Purpose                                                                                       |
-| ----------------------- | --------------- | ------------------------ | --------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`          | server          | yes                      | Runtime connection (Neon **pooled** URL in prod; `postgres://…@localhost:5432/rovor` locally) |
-| `DATABASE_URL_UNPOOLED` | migrations only | prod only                | Direct connection for DDL (falls back to `DATABASE_URL` locally)                              |
-| `DATABASE_URL_TEST`     | tests           | for integration tests    | `…/rovor_test`                                                                                |
-| `GITHUB_TOKEN`          | server          | no (recommended in prod) | Raises GitHub rate limit; fine-grained PAT, public read-only                                  |
-| `LOG_LEVEL`             | server          | no (`info`)              | Log verbosity                                                                                 |
+| Variable                | Where           | Required                 | Purpose                                                                                                                                                 |
+| ----------------------- | --------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`          | server          | yes                      | Runtime connection (Neon **pooled** URL in prod; `postgres://…@localhost:5433/rovor` locally — Docker maps host 5433 to avoid a local Postgres on 5432) |
+| `DATABASE_URL_UNPOOLED` | migrations only | prod only                | Direct connection for DDL (falls back to `DATABASE_URL` locally)                                                                                        |
+| `DATABASE_URL_TEST`     | tests           | for integration tests    | `…/rovor_test`                                                                                                                                          |
+| `GITHUB_TOKEN`          | server          | no (recommended in prod) | Raises GitHub rate limit; fine-grained PAT, public read-only                                                                                            |
+| `LOG_LEVEL`             | server          | no (`info`)              | Log verbosity                                                                                                                                           |
 
 No `NEXT_PUBLIC_*` variables are needed (the frontend calls same-origin `/api`). `.env.example` committed; `.env*` git-ignored. Env parsed by Zod in `src/server/env.ts`.
 
@@ -426,7 +426,7 @@ Tracked in `REQUIREMENTS.md` §4 (SUB-1…6, RM-1…8). Notes:
 ├── .env.example  .gitignore  docker-compose.yml        # postgres:16 + init script creating rovor_test
 ├── drizzle.config.ts
 ├── drizzle/                           # generated SQL migrations (committed)
-├── next.config.ts  tsconfig.json  eslint.config.mjs  vitest.config.ts  playwright.config.ts
+├── next.config.ts  tsconfig.json  eslint.config.mjs  vitest.config.mts  playwright.config.ts
 ├── .github/workflows/ci.yml
 ├── e2e/                               # Playwright specs
 ├── scripts/seed.ts
@@ -545,3 +545,28 @@ Each decision is recorded in the log below as: question → owning role → deci
 | Phase 9     | Provide a `GITHUB_TOKEN` for production.                              |
 | Phase 10    | Confirm the RM-7/RM-8 AI-usage content.                               |
 | Each commit | Approve each commit, per your global rule.                            |
+
+## Phase reviews
+
+### Phase 0 — Staff Engineer / Production Gate (2026-10-06)
+
+**Evidence:** a fresh clone of commit `fd284ef` passes `install --frozen-lockfile → format:check → lint → typecheck → test → build`.
+
+**Live checks on `next start`:**
+
+- An invalid `DATABASE_URL` is rejected while the server prepares, before any request is served, and the secret is not echoed.
+- The security headers are present and `X-Powered-By` is absent.
+- The built CSS resolves `html{font-family:var(--font-geist-sans)}`.
+
+| #    | Severity | Finding                                                                                                     | Action                                                                         |
+| ---- | -------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| P0-1 | Medium   | `engines.node: ">=22"` lets Vercel or CI pick a newer major than the one tested                             | Pinned to `22.x`                                                               |
+| P0-2 | Low      | The `shadcn` CLI was a runtime dependency; only its CSS is used, at build time                              | Moved to devDependencies                                                       |
+| P0-3 | Low      | pnpm silently ignored the `unrs-resolver` build script (an optional native fallback; lint works without it) | Recorded as `pnpm.ignoredBuiltDependencies`                                    |
+| P0-4 | Low      | The docs said local DB port 5432 and `vitest.config.ts`                                                     | Corrected to 5433 and `.mts`                                                   |
+| P0-5 | Info     | Bad config leaves the process up but every request returns 500, rather than the process exiting             | Accepted: on Vercel this surfaces as failed invocations with the logged reason |
+| P0-6 | Info     | GitHub Actions are pinned to tags, not SHAs                                                                 | Accepted for this scope                                                        |
+| P0-7 | Info     | CI has not run on GitHub yet (no push), so NFR-10 stays unchecked                                           | Re-verify after the first push                                                 |
+| P0-8 | Info     | No HSTS header; assumed Vercel sets it on its domains                                                       | Verify in the Phase 9 smoke test                                               |
+
+**Verdict:** pass.
