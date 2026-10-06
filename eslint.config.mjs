@@ -16,6 +16,25 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // NFR-2: the client/server boundary as a lint rule. Only API routes and server code may
+    // import server modules (`server-only` also fails the build if this is ever bypassed).
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/server/**', 'src/app/api/**', 'src/instrumentation.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/server', '@/server/*', '**/server/*'],
+              message: 'Server code is only importable from src/server/** and src/app/api/**.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   globalIgnores([
     '.next/**',
     'out/**',

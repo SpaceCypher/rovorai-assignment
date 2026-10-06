@@ -26,3 +26,9 @@ if (env.NODE_ENV !== 'production') globalForDb.__rovorSql = sql
 
 export const db = drizzle(sql, { schema })
 export type Db = typeof db
+
+/** Closes the pool (tests and scripts). The next import creates a fresh one. */
+export async function closeDb() {
+  await sql.end({ timeout: 5 })
+  globalForDb.__rovorSql = undefined
+}
