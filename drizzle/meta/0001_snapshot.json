@@ -1,0 +1,311 @@
+{
+  "id": "0f783f2d-8c67-44b8-a2ed-5c2e3fc45630",
+  "prevId": "77dcfb19-3f0b-4849-b741-19bae6d82ede",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.github_repo_cache": {
+      "name": "github_repo_cache",
+      "schema": "",
+      "columns": {
+        "repo_key": {
+          "name": "repo_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "etag": {
+          "name": "etag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "github_repo_cache_status": {
+          "name": "github_repo_cache_status",
+          "value": "\"github_repo_cache\".\"status\" IN ('ok', 'not_found')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.projects": {
+      "name": "projects",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "github_repo": {
+          "name": "github_repo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "projects_name_lower_uq": {
+          "name": "projects_name_lower_uq",
+          "columns": [
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "projects_name_not_blank": {
+          "name": "projects_name_not_blank",
+          "value": "length(btrim(\"projects\".\"name\")) > 0"
+        },
+        "projects_description_len": {
+          "name": "projects_description_len",
+          "value": "length(\"projects\".\"description\") <= 1000"
+        },
+        "projects_github_repo_format": {
+          "name": "projects_github_repo_format",
+          "value": "\"projects\".\"github_repo\" ~ '^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$' AND \"projects\".\"github_repo\" !~ '/[.]{1,2}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.tickets": {
+      "name": "tickets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "status": {
+          "name": "status",
+          "type": "ticket_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'todo'"
+        },
+        "priority": {
+          "name": "priority",
+          "type": "ticket_priority",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'medium'"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "tickets_project_updated_idx": {
+          "name": "tickets_project_updated_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "tickets_search_trgm_idx": {
+          "name": "tickets_search_trgm_idx",
+          "columns": [
+            {
+              "expression": "(\"title\" || ' ' || \"description\") gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tickets_project_id_projects_id_fk": {
+          "name": "tickets_project_id_projects_id_fk",
+          "tableFrom": "tickets",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "tickets_title_not_blank": {
+          "name": "tickets_title_not_blank",
+          "value": "length(btrim(\"tickets\".\"title\")) > 0"
+        },
+        "tickets_description_len": {
+          "name": "tickets_description_len",
+          "value": "length(\"tickets\".\"description\") <= 10000"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.ticket_priority": {
+      "name": "ticket_priority",
+      "schema": "public",
+      "values": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "public.ticket_status": {
+      "name": "ticket_status",
+      "schema": "public",
+      "values": [
+        "todo",
+        "in_progress",
+        "done"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

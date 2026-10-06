@@ -173,7 +173,7 @@ Browser ──fetch JSON──▶ Route Handler (src/app/api/**/route.ts)      t
 - **Runtime**: Node.js runtime for all route handlers (`export const runtime = 'nodejs'`; postgres.js needs TCP). `export const dynamic = 'force-dynamic'` on API routes so nothing is statically cached.
 - **DB client**: one module-level `postgres()` instance per function instance, `max: 5` (assumption: tune after first deploy), `prepare: false` (required by PgBouncer transaction-mode pooling, which Neon's pooled endpoint uses), `idle_timeout: 20`, `connect_timeout: 10`.
 - **Env**: `src/server/env.ts` parses `process.env` with Zod once; import fails fast with a readable message.
-- **`server-only`** imported at the top of every `src/server/**` module, so an accidental import from a client component breaks the build.
+- **`server-only`** imported at the top of every `src/server/**` module, so an accidental import from a client component breaks the build. One exception: `src/server/db/schema.ts`. It has to load outside Next.js (drizzle-kit, the seed script), and it contains only table definitions: no secrets, no connections.
 
 ## 7. API design and contracts
 
@@ -570,3 +570,26 @@ Each decision is recorded in the log below as: question → owning role → deci
 | P0-8 | Info     | No HSTS header; assumed Vercel sets it on its domains                                                       | Verify in the Phase 9 smoke test                                               |
 
 **Verdict:** pass.
+
+### Phase 1 — Backend + Database Reviewer (2026-10-06)
+
+**Evidence:**
+
+- A fresh volume, then `db:migrate`, applies `0000_enable_pg_trgm` and `0001_init` to both `rovor` and `rovor_test`.
+- `db:seed` inserts 3 projects and 18 tickets. Every status × priority pair appears exactly twice, and no ticket has `updated_at < created_at`.
+- With `enable_seqscan=off`, `EXPLAIN` shows a Bitmap Index Scan on `tickets_search_trgm_idx` for the exact search expression.
+
+**Constraint probes** (each run in a rolled-back transaction):
+
+- Rejected: blank name or title, a case-insensitive duplicate name, a URL in place of `owner/repo`, a description over 1000 chars, a title over 200 chars, a ticket for a missing project, an unknown enum value, an unknown cache status.
+- Allowed: `a/b`, `a/.github`.
+- Deleting a project cascades to its tickets (18 → 11).
+
+| #    | Severity                     | Finding                                                                                                                                               | Action                                                                                               |
+| ---- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| P1-1 | Medium                       | The repo CHECK accepted `a/..`, `a/.` and `-a/b`, none of which GitHub allows                                                                         | Tightened. Rewrote `0001_init` in place: nothing was committed or deployed yet.                      |
+| P1-2 | High (caught before running) | The first fix wrote `\.` inside a JS template literal, which emitted `'/.{1,2}$'` and would have rejected every 1–2 character repo name such as `a/b` | Switched to `[.]`, which needs no escaping. Checked the generated SQL and probed `a/b` (allowed)     |
+| P1-3 | Info                         | `schema.ts` is the one `src/server` file without `server-only`                                                                                        | Documented as a deliberate exception (§6)                                                            |
+| P1-4 | Info                         | The seed resets only local hosts; `--if-empty` is the only mode allowed against remote databases                                                      | Verified: a remote host is refused with a clear message, and `--if-empty` on a seeded database skips |
+
+**Verdict:** pass. DB-1 stays unchecked until Neon is connected in Phase 9.

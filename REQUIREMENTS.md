@@ -91,10 +91,10 @@ Legend: `[ ]` not started · `[x]` done and verified · **Verify** = U (unit tes
 | ID       | Requirement                               | Acceptance criteria                                                                              | Verify |
 | -------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ | ------ |
 | [ ] DB-1 | Persistent database                       | PostgreSQL (Docker locally, Neon in production)                                                  | M      |
-| [ ] DB-2 | Projects, Tickets, and their relationship | `tickets.project_id` FK → `projects.id`, `ON DELETE CASCADE`, NOT NULL                           | I      |
-| [ ] DB-3 | Versioned migrations                      | Drizzle SQL migrations committed under `drizzle/`                                                | M      |
-| [ ] DB-4 | Seed data                                 | 3 projects (2 with real public repos, 1 without) and 18 tickets covering every status × priority | M      |
-| [ ] DB-5 | Seed is safe to re-run                    | `pnpm db:seed` resets dev data; `--if-empty` mode used for production                            | M      |
+| [x] DB-2 | Projects, Tickets, and their relationship | `tickets.project_id` FK → `projects.id`, `ON DELETE CASCADE`, NOT NULL                           | I      |
+| [x] DB-3 | Versioned migrations                      | Drizzle SQL migrations committed under `drizzle/`                                                | M      |
+| [x] DB-4 | Seed data                                 | 3 projects (2 with real public repos, 1 without) and 18 tickets covering every status × priority | M      |
+| [x] DB-5 | Seed is safe to re-run                    | `pnpm db:seed` resets dev data; `--if-empty` mode used for production                            | M      |
 
 ### 1.8 GitHub insights + caching (PDF §8, §9)
 
