@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { PriorityBadge, StatusBadge } from '@/components/ticket-badges'
+import { PriorityBadge, StatusPill } from '@/components/ticket-badges'
 import { TimeAgo } from '@/components/time-ago'
 import type { Ticket } from '@/shared/schemas/api'
 
@@ -36,7 +36,7 @@ export function TicketList({ tickets }: { tickets: Ticket[] }) {
                 )}
               </span>
               <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs md:contents md:text-sm">
-                <StatusBadge status={ticket.status} />
+                <StatusPill status={ticket.status} className="w-fit" />
                 <PriorityBadge priority={ticket.priority} />
                 <span className="text-muted-foreground md:text-right md:text-xs">
                   <TimeAgo iso={ticket.updatedAt} />

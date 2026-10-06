@@ -1,6 +1,19 @@
 'use client'
 
-import { Archive, ExternalLink, RefreshCw } from 'lucide-react'
+import {
+  Archive,
+  CircleDot,
+  Clock,
+  Code,
+  ExternalLink,
+  Eye,
+  GitBranch,
+  GitFork,
+  RefreshCw,
+  Scale,
+  Star,
+  type LucideIcon,
+} from 'lucide-react'
 import { TimeAgo } from '@/components/time-ago'
 import { Button } from '@/components/ui/button'
 import { useProject, useRepositoryInsights } from '@/features/projects/hooks'
@@ -10,10 +23,25 @@ import { formatCompact, formatNumber } from '@/lib/format'
 import { useDelayedFlag } from '@/lib/use-delayed-flag'
 import type { RepoInsights } from '@/shared/schemas/api'
 
-function Metric({ label, value, full }: { label: string; value: string; full?: string }) {
+// Icons are decorative: the visible label is the accessible name.
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  full,
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+  full?: string
+}) {
   return (
-    <div className="rounded-md bg-muted px-3 py-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+    // Column + justify-between: numbers stay aligned when a label wraps (same fix as count tiles).
+    <div className="flex flex-col justify-between gap-1 rounded-md bg-muted px-3 py-2">
+      <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        {label}
+      </dt>
       <dd className="tabular truncate text-base font-semibold" title={full ?? value}>
         {value}
       </dd>
@@ -21,10 +49,21 @@ function Metric({ label, value, full }: { label: string; value: string; full?: s
   )
 }
 
-function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+function Detail({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: LucideIcon
+  label: string
+  children: React.ReactNode
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <dt className="text-muted-foreground">{label}</dt>
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <dt className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        {label}
+      </dt>
       <dd className="min-w-0 truncate text-right">{children}</dd>
     </div>
   )
@@ -35,15 +74,15 @@ function InsightsBody({ insights }: { insights: RepoInsights }) {
   return (
     <>
       <dl className="grid grid-cols-2 gap-2">
-        <Metric label="Stars" {...count(insights.stars)} />
-        <Metric label="Forks" {...count(insights.forks)} />
-        <Metric label="Open issues & PRs" {...count(insights.openIssuesAndPrs)} />
-        <Metric label="Watchers" {...count(insights.watchers)} />
+        <Metric icon={Star} label="Stars" {...count(insights.stars)} />
+        <Metric icon={GitFork} label="Forks" {...count(insights.forks)} />
+        <Metric icon={CircleDot} label="Open issues & PRs" {...count(insights.openIssuesAndPrs)} />
+        <Metric icon={Eye} label="Watchers" {...count(insights.watchers)} />
       </dl>
       <dl className="divide-y">
         {/* PDF §8 "last updated information". Uses pushed_at (last code push): GitHub's
             updated_at also changes when someone stars the repo, so it says little about activity. */}
-        <Detail label="Last updated">
+        <Detail icon={Clock} label="Last updated">
           {insights.pushedAt ? (
             <span title="Last code push to the repository">
               <TimeAgo iso={insights.pushedAt} prefix="pushed" />
@@ -52,9 +91,13 @@ function InsightsBody({ insights }: { insights: RepoInsights }) {
             'No pushes yet'
           )}
         </Detail>
-        <Detail label="Language">{insights.language ?? '—'}</Detail>
-        <Detail label="License">{insights.license ?? 'None'}</Detail>
-        <Detail label="Default branch">
+        <Detail icon={Code} label="Language">
+          {insights.language ?? '—'}
+        </Detail>
+        <Detail icon={Scale} label="License">
+          {insights.license ?? 'None'}
+        </Detail>
+        <Detail icon={GitBranch} label="Default branch">
           <span className="font-mono text-xs">{insights.defaultBranch}</span>
         </Detail>
       </dl>

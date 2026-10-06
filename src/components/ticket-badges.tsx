@@ -41,6 +41,32 @@ export function StatusIcon({
   )
 }
 
+const STATUS_SURFACE: Record<TicketStatus, string> = {
+  todo: 'bg-status-todo-bg text-status-todo-fg',
+  in_progress: 'bg-status-progress-bg text-status-progress-fg',
+  done: 'bg-status-done-bg text-status-done-fg',
+}
+
+/** Tinted pill for dense lists: icon + text on a faint status tint (all pairs ≥4.5:1). */
+export function StatusPill({ status, className }: { status: TicketStatus; className?: string }) {
+  const { icon: Icon } = STATUS_ICON[status]
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
+        STATUS_SURFACE[status],
+        className,
+      )}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      {STATUS_LABELS[status]}
+    </span>
+  )
+}
+
+/** Faint status tint for summary surfaces (count tiles). */
+export const statusSurface = (status: TicketStatus) => STATUS_SURFACE[status]
+
 export function StatusBadge({ status, className }: { status: TicketStatus; className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap', className)}>

@@ -16,6 +16,7 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { GithubIcon } from '@/components/github-icon'
 import { PageHeader } from '@/components/page-header'
 import { EmptyState, ErrorState } from '@/components/states'
 import { Button } from '@/components/ui/button'
@@ -147,7 +148,11 @@ export function ProjectView({ projectId }: { projectId: string }) {
             </span>
             {/* Same "repo line" as the dashboard card: a link when connected, a quiet way to connect otherwise. */}
             <span className="mt-1 flex items-center gap-1.5 text-xs">
-              <FolderGit className="size-3.5 shrink-0" aria-hidden />
+              {p.githubRepo ? (
+                <GithubIcon className="size-3.5 shrink-0" />
+              ) : (
+                <FolderGit className="size-3.5 shrink-0" aria-hidden />
+              )}
               {p.githubRepo ? (
                 <a
                   href={`https://github.com/${p.githubRepo}`}

@@ -2,6 +2,7 @@
 
 import { ArrowRight, FolderGit, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { GithubIcon } from '@/components/github-icon'
 import { PriorityBadge, StatusIcon } from '@/components/ticket-badges'
 import { TimeAgo } from '@/components/time-ago'
 import { Button } from '@/components/ui/button'
@@ -60,7 +61,11 @@ export function ProjectCard({ project, onCreateTicket }: ProjectCardProps) {
         </p>
         {/* Always one line, so cards side by side keep their counts and lists aligned. */}
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <FolderGit className="size-3.5" aria-hidden />
+          {project.githubRepo ? (
+            <GithubIcon className="size-3.5 shrink-0" />
+          ) : (
+            <FolderGit className="size-3.5 shrink-0" aria-hidden />
+          )}
           {project.githubRepo ? (
             <span className="truncate font-mono" title={project.githubRepo}>
               {project.githubRepo}
