@@ -42,7 +42,7 @@ function Chip({
         'inline-flex h-9 items-center rounded-full border px-3.5 text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
         pressed
           ? 'border-primary bg-primary/10 font-medium'
-          : 'border-border bg-card hover:bg-muted',
+          : 'border-border bg-card hover:border-primary/40 hover:bg-muted hover:shadow-sm',
       )}
     >
       {children}

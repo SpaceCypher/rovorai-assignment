@@ -1,20 +1,15 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google'
 import { AppFooter } from '@/components/app-footer'
 import { AppHeader } from '@/components/app-header'
 import { OfflineBanner } from '@/components/offline-banner'
 import { Providers } from './providers'
 import './globals.css'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
+// Inter for dense UI text, Bricolage Grotesque for headings (character), JetBrains Mono for repo names/ids.
+const sans = Inter({ variable: '--font-ui-sans', subsets: ['latin'] })
+const heading = Bricolage_Grotesque({ variable: '--font-ui-heading', subsets: ['latin'] })
+const mono = JetBrains_Mono({ variable: '--font-ui-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: { default: 'RovorAI Tickets', template: '%s · RovorAI Tickets' },
@@ -23,7 +18,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${sans.variable} ${heading.variable} ${mono.variable} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">
         <a
           href="#main"

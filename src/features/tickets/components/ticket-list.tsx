@@ -37,13 +37,13 @@ export function TicketList({ tickets, footer }: { tickets: Ticket[]; footer?: Re
             <li
               key={ticket.id}
               data-testid="ticket-row"
-              className={`relative px-4 py-3 has-[a:hover]:bg-muted has-[a:focus-visible]:bg-muted ${COLUMNS}`}
+              className={`group/row relative px-4 py-3 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:origin-top before:scale-y-0 before:bg-primary before:transition-transform before:duration-200 has-[a:hover]:bg-muted has-[a:hover]:before:scale-y-100 has-[a:focus-visible]:bg-muted ${COLUMNS}`}
             >
               <span className="block min-w-0">
                 <Link
                   href={href}
                   title={ticket.title}
-                  className="block truncate font-medium after:absolute after:inset-0 focus-visible:outline-none after:focus-visible:ring-3 after:focus-visible:ring-ring/50 after:focus-visible:ring-inset"
+                  className="block truncate font-medium transition-colors group-has-[a:hover]/row:text-primary after:absolute after:inset-0 focus-visible:outline-none after:focus-visible:ring-3 after:focus-visible:ring-ring/50 after:focus-visible:ring-inset"
                 >
                   {ticket.title}
                 </Link>

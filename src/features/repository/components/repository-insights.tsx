@@ -37,7 +37,7 @@ function Metric({
 }) {
   return (
     // Column + justify-between: numbers stay aligned when a label wraps (same fix as count tiles).
-    <div className="flex flex-col justify-between gap-1 rounded-md bg-muted px-3 py-2">
+    <div className="flex flex-col justify-between gap-1 rounded-md bg-muted px-3 py-2 transition-[box-shadow] duration-300 ease-out hover:shadow-[0_6px_16px_-6px_oklch(0.3_0.06_275/0.16)]">
       <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon className="size-3.5 shrink-0" aria-hidden />
         {label}

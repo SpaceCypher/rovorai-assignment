@@ -1,5 +1,6 @@
 'use client'
 
+import { FolderPlus, GitBranch, Pencil } from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -15,6 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogIcon,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -104,6 +106,7 @@ export function ProjectFormDialog({
       <DialogContent className="sm:max-w-lg">
         <form onKeyDown={submitOnModEnter} onSubmit={onSubmit} noValidate className="grid gap-6">
           <DialogHeader>
+            <DialogIcon icon={isEdit ? Pencil : FolderPlus} />
             <DialogTitle>{isEdit ? 'Edit project' : 'New project'}</DialogTitle>
             <DialogDescription>
               {isEdit
@@ -131,6 +134,7 @@ export function ProjectFormDialog({
             <FormField label="Name" error={errors.name?.message}>
               <Input
                 autoFocus={!focusRepo}
+                placeholder="e.g. Mobile App"
                 maxLength={LIMITS.projectName}
                 autoComplete="off"
                 {...form.register('name')}
@@ -139,6 +143,7 @@ export function ProjectFormDialog({
             <FormField label="Description" optional error={errors.description?.message}>
               <Textarea
                 rows={3}
+                placeholder="What this project covers"
                 maxLength={LIMITS.projectDescription}
                 {...form.register('description')}
               />
@@ -153,14 +158,24 @@ export function ProjectFormDialog({
               }
               error={errors.githubRepo?.message}
             >
-              <Input
-                autoFocus={focusRepo}
-                placeholder="vercel/next.js"
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                {...form.register('githubRepo')}
-              />
+              {(control) => (
+                <div className="relative">
+                  <GitBranch
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    {...control}
+                    autoFocus={focusRepo}
+                    placeholder="vercel/next.js"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="pl-9 font-mono"
+                    {...form.register('githubRepo')}
+                  />
+                </div>
+              )}
             </FormField>
           </div>
           <DialogFooter>

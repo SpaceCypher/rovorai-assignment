@@ -22,13 +22,13 @@ export function ProjectCard({ project, onCreateTicket }: ProjectCardProps) {
   const { done, total } = project.ticketCounts
   return (
     <Card
-      className="flex flex-col gap-0 py-0"
+      className="flex flex-col gap-0 py-0 shadow-sm transition-[box-shadow] duration-300 ease-out hover:shadow-[0_1px_2px_oklch(0.3_0.03_275/0.06),0_8px_24px_-6px_oklch(0.3_0.06_275/0.14),0_24px_48px_-12px_oklch(0.3_0.06_275/0.12)] hover:ring-primary/20 focus-within:ring-primary/25"
       data-testid="project-card"
       aria-labelledby={`project-${project.id}`}
     >
       <CardHeader className="gap-1 px-5 pt-5 pb-4">
         <div className="flex items-start justify-between gap-3">
-          <h2 id={`project-${project.id}`} className="min-w-0 text-base font-semibold">
+          <h2 id={`project-${project.id}`} className="min-w-0 text-lg font-semibold">
             <Link
               href={href}
               title={project.name}

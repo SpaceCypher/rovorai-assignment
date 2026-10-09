@@ -139,3 +139,19 @@ test('the tab icon is the app mark, not the framework default', async ({ page, r
   expect(res.headers()['content-type']).toContain('image/svg+xml')
   expect((await request.get('/favicon.ico')).status()).toBe(404)
 })
+
+test('header shows totals, and project search filters the cards', async ({ page }) => {
+  await page.goto('/')
+  // Seed: 3 projects, 18 tickets, 6 done.
+  await expect(page.getByText('3 projects')).toBeVisible()
+  await expect(page.getByText('18 tickets')).toBeVisible()
+  await expect(page.getByText('12 open')).toBeVisible()
+  const search = page.getByRole('searchbox', { name: 'Search projects' })
+  await search.fill('drizzle')
+  await expect(page.getByTestId('project-card')).toHaveCount(1)
+  await expect(page.getByTestId('project-card')).toContainText('Data Layer')
+  await search.fill('nothing-like-this')
+  await expect(page.getByText('No projects match')).toBeVisible()
+  await page.getByRole('button', { name: 'Clear search' }).click()
+  await expect(page.getByTestId('project-card')).toHaveCount(3)
+})

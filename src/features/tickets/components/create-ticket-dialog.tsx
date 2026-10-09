@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { TicketPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -13,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogIcon,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { applyServerErrors } from '@/lib/form-errors'
@@ -72,6 +74,7 @@ export function CreateTicketDialog({
       <DialogContent className="sm:max-w-lg">
         <form onKeyDown={submitOnModEnter} onSubmit={onSubmit} noValidate className="grid gap-6">
           <DialogHeader>
+            <DialogIcon icon={TicketPlus} />
             <DialogTitle>New ticket</DialogTitle>
             <DialogDescription className="truncate">in {projectName}</DialogDescription>
           </DialogHeader>
